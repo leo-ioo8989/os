@@ -49,14 +49,13 @@ test('V1.09 complete real orchestrator-to-handler workflow execution path comple
     const secondCycle = await orchestrator.orchestrate(organization.id, workflow.id);
     assert.equal(secondCycle.jobsDispatched, 1);
     assert.equal((await db.task.findUnique({ where: { id: second.id } }))?.status, 'COMPLETED');
-    assert.equal((await db.workflow.findUnique({ where: { id: workflow.id } }))?.status, 'RUNNING');
-    const thirdCycle = await orchestrator.orchestrate(organization.id, workflow.id);
     assert.equal((await db.workflow.findUnique({ where: { id: workflow.id } }))?.status, 'COMPLETED');
+    const thirdCycle = await orchestrator.orchestrate(organization.id, workflow.id);
+    assert.equal(thirdCycle.stoppedReason, 'TERMINAL');
     const jobs = await db.job.findMany({ where: { organizationId: organization.id, workflowId: workflow.id }, orderBy: { createdAt: 'asc' } });
     assert.equal(jobs.length, 2);
     assert.deepEqual(jobs.map(job => job.status), ['SUCCEEDED', 'SUCCEEDED']);
     assert.equal((await db.task.count({ where: { objectiveId: objective.id, status: 'COMPLETED' } })), 2);
-    assert.equal(thirdCycle.stoppedReason, 'SUCCEEDED_RECONCILED');
   } finally {
     await cleanup(organization.id);
   }
