@@ -31,6 +31,8 @@ enum RiskLevel {
   GREEN
   YELLOW
   RED
+  HIGH
+  CRITICAL
 }
 
 enum TaskStatus {
