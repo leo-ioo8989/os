@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@founder-os/db';
-import { AUDIT_EVENTS, JobRepository, WorkerRepository } from '@founder-os/db';
+import { AUDIT_EVENTS, JobRepository, WorkerRepository, recordAuditEvent, type AuditEventType } from '@founder-os/db';
 import type { JobStatus } from '@founder-os/core';
 export class JobService {
  private readonly repository:JobRepository; private readonly workers:WorkerRepository;
@@ -18,6 +18,7 @@ export class JobService {
  cancel(organizationId:string,id:string,workerId:string){return this.repository.transition(organizationId,id,'RUNNING','CANCELLED',workerId,{organizationId,actorType:'SYSTEM',action:'cancel',result:'SUCCESS'})}
  recoverStale(organizationId:string,id:string){return this.repository.recoverStale(organizationId,id,{organizationId,actorType:'SYSTEM',action:'recover_stale',result:'SUCCESS'})}
  checkpoint(organizationId:string,id:string,workerId:string,state:Record<string,unknown>){return this.repository.checkpoint(organizationId,id,state,workerId,{organizationId,actorType:'SYSTEM',action:'checkpoint',result:'SUCCESS'})}
+ audit(organizationId:string,eventType:AuditEventType,resourceType:string,resourceId:string,action:string,result:'SUCCESS'|'FAILURE'|'DENIED',metadata:Record<string,unknown>={}){return recordAuditEvent(this.db,{organizationId,actorType:'SYSTEM',eventType,resourceType,resourceId,action,result,metadata:metadata as never});}
  async resumeCandidate(organizationId:string,id:string){const job=await this.repository.get(organizationId,id);if(!job)return null;if(job.status==='RETRY_QUEUED')return job;if(job.status==='CLAIMED'||job.status==='RUNNING')return job.leaseExpiresAt&&job.leaseExpiresAt<=new Date()?this.repository.recoverStale(organizationId,id,{organizationId,actorType:'SYSTEM',action:'recover_stale',result:'SUCCESS'}):job;return null;}
 }
 export type {JobStatus};
