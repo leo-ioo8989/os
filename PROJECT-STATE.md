@@ -7,22 +7,26 @@
 V1.01 — evolving the existing V0.1 foundation without rebuilding it.
 
 ## CURRENT PHASE
-Phase 1 → Phase 2 transition: domain/control-plane foundation established; durable persistence is next.
+Phase 2 foundation: durable control-plane persistence introduced; application services and authentication/RBAC are next.
 
 ## COMPLETED
-- Existing repository audited against the V1.01 requirements.
-- Verified current implementation documented in `FOUNDER_OS_CURRENT_STATE.md`.
-- Existing permission primitive preserved.
-- V1.01 objective domain contract added with required lifecycle statuses and cost/deadline fields.
-- Deterministic task/dependency graph added with dependency reference validation, duplicate-edge checks, self-dependency checks, cycle detection, ready-state calculation, blocked-state calculation, graph analysis, and execution-wave discovery.
-- Extensible common Agent Registry added with all 21 requested initial agent identities and common agent contract fields.
-- Core domain exports consolidated through `packages/core/src/index.ts`.
+- Existing repository audited against V1.01 requirements.
+- `FOUNDER_OS_CURRENT_STATE.md` refreshed from the verified tree.
+- Existing deterministic permission primitive preserved.
+- V1.01 objective domain contract added with lifecycle statuses and cost/deadline fields.
+- Deterministic task/dependency graph added with dependency validation, cycle detection, ready/blocked calculation, graph analysis, and execution-wave discovery.
+- Common Agent Registry added with all 21 requested initial agent identities.
+- Core domain exports consolidated.
+- `packages/db` added with Prisma/PostgreSQL configuration.
+- Durable models added for organizations, objectives, tasks, and task dependencies.
+- Initial SQL migration added for the control-plane objective/task graph state.
+- Shared Prisma client/export boundary added.
 
 ## IN PROGRESS
-- Durable PostgreSQL/Prisma persistence for objectives, tasks, dependencies, agents and execution state.
+- Database repositories and transactional objective/task services.
 - Authentication and RBAC.
-- API services around the domain contracts.
-- Automated test/CI infrastructure.
+- API services/routes around persistent control-plane state.
+- Automated tests and CI.
 - Orchestrator and durable worker runtime.
 
 ## BLOCKED
@@ -32,19 +36,19 @@ Phase 1 → Phase 2 transition: domain/control-plane foundation established; dur
 - None.
 
 ## KNOWN ISSUES
-- The repository is still an early foundation; the V1.01 runtime is not complete.
-- Objective/task contracts are currently domain-level and not yet persisted.
-- The API remains a minimal raw Node HTTP boundary; migration to the documented Fastify boundary should happen as application services are introduced, not as an unnecessary rewrite.
-- No web Command Center or worker application is currently verified in the repository tree.
+- Database connectivity and migrations have not been executed in a live environment from this session.
+- Objective/task contracts are persisted only at schema level; repository/application service code is next.
+- API remains a minimal raw Node HTTP boundary until application services/routes are ready.
+- Web Command Center and worker applications are not yet verified in the tree.
 
 ## TECHNICAL DEBT
-- Root workspace scripts need matching package implementations and lockfile/CI validation.
-- Package-level TypeScript configuration and automated tests need to be added.
-- Permission primitives need to be connected to a real authorization/tool gateway.
-- Domain contracts need persistence and versioned migrations before autonomous execution is enabled.
+- Root workspace dependency lockfile and CI validation still need to be established.
+- Database tests need a reproducible PostgreSQL test environment.
+- Permission primitive needs to connect to real authentication and execution authorization.
+- Autonomous execution must remain disabled until durable state, approvals, validation, retry limits, budgets, and audit are enforced.
 
 ## NEXT PRIORITY
-Build the durable PostgreSQL/Prisma control-plane schema and migration foundation for objectives, tasks, dependencies, agents, approvals and execution state, then add authentication/RBAC before exposing mutable founder-control APIs.
+Build the persistence repository/service layer over Prisma for objectives and task/dependency graphs, with transaction-safe state transitions and deterministic graph validation. Then add authentication/RBAC before mutable founder-control APIs.
 
 ## NEXT AUTOMATIC STEP
-Implement the database package and first migration for persistent objectives and task/dependency graph state. Preserve the pure domain graph engine as the deterministic validation layer used by persistence and orchestration.
+Implement `packages/db` repositories/services for objective and task graph persistence, keeping `packages/core` as the pure deterministic domain layer.
