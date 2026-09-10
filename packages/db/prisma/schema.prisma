@@ -16,6 +16,7 @@ enum ActorType { USER AGENT SYSTEM }
 enum AuditResult { SUCCESS FAILURE DENIED }
 enum ApprovalStatus { PENDING APPROVED REJECTED EXPIRED CANCELLED }
 enum WorkflowStatus { PENDING RUNNING WAITING_APPROVAL PAUSED COMPLETED FAILED CANCELLED }
+enum JobStatus { QUEUED CLAIMED RUNNING RETRY_QUEUED SUCCEEDED FAILED CANCELLED }
 
 model Organization {
   id String @id @default(cuid())
@@ -27,6 +28,8 @@ model Organization {
   auditEvents AuditEvent[]
   approvals Approval[]
   workflows Workflow[]
+  jobs Job[]
+  checkpoints Checkpoint[]
 }
 model User {
   id String @id @default(cuid())
@@ -83,6 +86,7 @@ model Objective {
   metadata Json
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   tasks Task[]
+  jobs Job[]
   @@index([organizationId, status])
   @@index([organizationId, priority])
   @@index([deadline])
@@ -107,6 +111,7 @@ model Task {
   objective Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
   dependencies TaskDependency[] @relation("taskDependencies")
   dependents TaskDependency[] @relation("taskDependents")
+  jobs Job[]
   @@index([objectiveId, status])
   @@index([assignedAgentId, status])
 }
@@ -181,4 +186,50 @@ model Workflow {
   @@index([organizationId, status, updatedAt])
   @@index([organizationId, objectiveId])
   @@index([currentTaskId])
+}
+model Job {
+  id String @id @default(cuid())
+  organizationId String
+  objectiveId String?
+  taskId String?
+  workflowId String?
+  status JobStatus @default(QUEUED)
+  attemptNumber Int @default(0)
+  maxAttempts Int @default(3)
+  priority Int @default(0)
+  workerId String?
+  leaseExpiresAt DateTime?
+  lastHeartbeatAt DateTime?
+  startedAt DateTime?
+  completedAt DateTime?
+  failureCode String?
+  failureMessage String?
+  failureRetryable Boolean?
+  nextRetryAt DateTime?
+  resumableState Json
+  metadata Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  objective Objective? @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  checkpoints Checkpoint[]
+  @@index([organizationId, status, priority, createdAt])
+  @@index([organizationId, workerId, status])
+  @@index([organizationId, leaseExpiresAt])
+  @@index([objectiveId, status])
+  @@index([taskId, status])
+  @@index([workflowId, status])
+}
+model Checkpoint {
+  id String @id @default(cuid())
+  organizationId String
+  jobId String
+  version Int
+  state Json
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  @@unique([jobId, version])
+  @@index([organizationId, jobId, createdAt])
 }
