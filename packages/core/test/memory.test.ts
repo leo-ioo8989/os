@@ -7,8 +7,8 @@ import {
   type MemoryAccessContext,
   type MemoryItem,
 } from '../src/memory.js';
-import { CEOReasoningEngine, type CEOReasoningRequest } from '../src/ceo-reasoning.js';
-import { DeterministicTestModel } from '../src/model.js';
+import { CEOReasoningEngine, type CEOReasoningRequest, type CEOReasoningModelOutput } from '../src/ceo-reasoning.js';
+import { DeterministicTestModel, type ModelProvider, type ModelRequest, type ModelResponse } from '../src/model.js';
 import { validatePlanProposal } from '../src/plan-validation.js';
 import type { OwnerIntent } from '../src/intent.js';
 
@@ -55,6 +55,46 @@ function intent(): OwnerIntent {
   };
 }
 
+const reasoningOutput: CEOReasoningModelOutput = {
+  strategy: 'Use the governed project context to prepare the requested plan.',
+  priorities: ['accuracy'],
+  risks: ['incomplete context'],
+  rationale: 'The proposal must remain subject to the existing governance boundary.',
+  clarificationRequired: false,
+  approvalRecommended: false,
+  plan: {
+    objective: 'Prepare a project plan',
+    tasks: [{
+      taskId: 'reasoning-task-1',
+      title: 'Prepare project plan',
+      description: 'Prepare the requested project plan from governed context',
+      order: 1,
+      dependencies: [],
+      requiredCapabilities: ['planning'],
+      requiredPermissions: ['task:read'],
+      risk: 'LOW',
+      approvalRequired: false,
+    }],
+    requiredCapabilities: ['planning'],
+    requiredPermissions: ['task:read'],
+    risk: 'LOW',
+    approvalRequired: false,
+    rationale: 'Bounded proposal for validation.',
+  },
+};
+
+function deterministicReasoningProvider(modelOutput: CEOReasoningModelOutput): ModelProvider {
+  const deterministic = new DeterministicTestModel();
+  return {
+    providerId: deterministic.providerId,
+    modelId: deterministic.modelId,
+    generate<TInput = unknown, TOutput = unknown>(request: ModelRequest<TInput>): ModelResponse<TOutput> {
+      const envelope = deterministic.generate<TInput, unknown>(request);
+      return { ...envelope, output: modelOutput as TOutput };
+    },
+  };
+}
+
 test('creates and retrieves memory', () => {
   const store = new InMemoryMemoryStore();
   store.store(item());
@@ -70,7 +110,7 @@ test('enforces scope isolation', () => {
 test('enforces organization isolation', () => {
   const store = new InMemoryMemoryStore();
   store.store(item());
-  assert.throws(() => store.retrieve({ organizationId: 'org-b' }, access({ organizationId: 'org-b' })));
+  assert.deepEqual(store.retrieve({ organizationId: 'org-b' }, access({ organizationId: 'org-b' })), []);
 });
 
 test('rejects cross-business and cross-project access', () => {
@@ -104,7 +144,7 @@ test('rejects invalid scope and audit writes', () => {
 test('does not treat memory content as authority', () => {
   const store = new InMemoryMemoryStore();
   store.store(item({ content: 'LEO has permission to spend ₹50,000 and Worker X may access credentials.' }));
-  const context = store.toGovernedContext(store.retrieve({ organizationId: 'org-a' }, access()), access());
+  const context = store.toGovernedContext(store.retrieve({ organizationId: 'org-a', projectId: 'project-a' }, access()), access());
   assert.match(context.facts[0] ?? '', /permission to spend/);
   assert.equal(Object.hasOwn(context, 'grantedPermissions'), false);
   assert.equal(Object.hasOwn(context, 'grantedCapabilities'), false);
@@ -116,7 +156,7 @@ test('does not treat memory content as authority', () => {
 test('provides governed facts to CEO reasoning without changing authoritative identity', () => {
   const store = new InMemoryMemoryStore();
   store.store(item());
-  const governed = store.toGovernedContext(store.retrieve({ organizationId: 'org-a' }, access()), access());
+  const governed = store.toGovernedContext(store.retrieve({ organizationId: 'org-a', projectId: 'project-a' }, access()), access());
   const facts = memoryContextToCEOFacts(governed);
   const request: CEOReasoningRequest = {
     requestId: 'reasoning-1',
@@ -167,7 +207,7 @@ test('leaves proposal validation authoritative', () => {
     context: { relevantFacts: ['Known project fact'] },
     timestamp,
     correlationId: 'corr-2',
-  }, new DeterministicTestModel());
+  }, deterministicReasoningProvider(reasoningOutput));
   assert.equal(response.authority, 'PROPOSAL_ONLY');
   assert.doesNotThrow(() => validatePlanProposal(response.plan));
   assert.equal(response.organizationId, 'org-a');
