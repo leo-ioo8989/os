@@ -1,6 +1,6 @@
 # LEO OS — Phase 2 Slice #2 — Provider-Neutral Model Boundary
 
-**Status:** IMPLEMENTED — VERIFICATION PENDING
+**Status:** VERIFIED / CERTIFIED
 **Phase 1:** Frozen and certified
 **Phase 2 Slice #1:** Verified / certified
 
@@ -99,7 +99,17 @@ It exists solely for domain testing and does not represent a production model pr
 
 No model response directly enters the Phase 1 execution path.
 
-## 8. Explicitly not implemented
+## 8. Verification / certification evidence
+
+The existing repository GitHub Actions verification workflow executed against Slice #2 at commit `5352c88b1e613b405bef46b4d3a616c2d793995f` as Run #170 / Run ID `34500847120` and completed successfully.
+
+The verification executed the historical V1.07/V1.08 regression gate and the complete V1.01–V1.09 gate after a clean database reset. The successful run included workspace typecheck, lint, build, Core/DB/API/Worker unit tests, database smoke verification, and DB integration tests.
+
+The Core test suite reported **45/45 passed**, including the Slice #2 model and model-to-proposal security tests. DB reported **33/33**, API **9/9**, Worker **5/5**, and DB integration **21/21**.
+
+No migration was added; the verification found the existing 9 migrations with no pending migration. The successful run is evidence that the Slice #2 addition remained compatible with the certified Phase 1 runtime.
+
+## 9. Explicitly not implemented
 
 This slice does not implement:
 
@@ -116,12 +126,14 @@ This slice does not implement:
 - automatic workflow/job creation;
 - worker dispatch or execution.
 
-## 9. Compatibility
+## 10. Compatibility
 
 Slice #2 is additive to Slice #1 and Phase 1. The existing PlanProposal contract and TaskGraph validator remain the governed seam. No database schema, migration, API endpoint, worker, dispatcher, orchestrator, execution gateway, or Phase 1 certification artifact is changed by this slice.
 
 Removing the Slice #2 modules and their exports/tests leaves the previously certified Phase 1 and Slice #1 layers structurally intact.
 
-## 10. Verification state
+## 11. Certification decision
 
-This document intentionally remains **VERIFICATION PENDING** until the repository's actual CI verification completes successfully. No certification is claimed by implementation alone.
+**PHASE 2 SLICE #2 — VERIFIED/CERTIFIED**
+
+Certification is limited to the provider-neutral model abstraction, deterministic test provider, governed model-to-proposal adapter, provenance/failure contracts, and their compatibility with the existing proposal/task-graph boundary. It does not certify any real model provider, CEO reasoning, memory, employee, delegation, integration, or external execution capability.
