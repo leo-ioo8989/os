@@ -1,5 +1,8 @@
-import type { PrismaClient } from '@prisma/client';
-import { WorkflowJobRepository } from '@founder-os/db';
+import type { PrismaClient, WorkflowStatus } from '@prisma/client';
+import { WorkflowJobRepository, WorkflowRepository, reconcileWorkflow, cancelWorkflow } from '@founder-os/db';
 import { ApiError } from './errors.js';
 export async function linkWorkflowJob(db:PrismaClient,organizationId:string,workflowId:string,jobId:string,actorId?:string){const item=await new WorkflowJobRepository(db).link(organizationId,workflowId,jobId,actorId);if(!item)throw new ApiError(404,'NOT_FOUND','Workflow or job not found in this organization.');return item;}
 export async function getWorkflowJobSummary(db:PrismaClient,organizationId:string,workflowId:string){const item=await new WorkflowJobRepository(db).summary(organizationId,workflowId);if(!item)throw new ApiError(404,'NOT_FOUND','Workflow not found.');return item;}
+export async function transitionWorkflow(db:PrismaClient,organizationId:string,workflowId:string,status:WorkflowStatus,audit:Parameters<WorkflowRepository['transition']>[3]){const result=await new WorkflowRepository(db).transition(organizationId,workflowId,status,audit);if(result.kind==='missing')throw new ApiError(404,'NOT_FOUND','Workflow not found.');if(result.kind==='conflict')throw new ApiError(409,'CONFLICT',`Invalid workflow transition from ${result.status} to ${status}.`);return result.item;}
+export async function reconcileWorkflowState(db:PrismaClient,organizationId:string,workflowId:string,audit:Parameters<typeof reconcileWorkflow>[2]){const result=await reconcileWorkflow(db,organizationId,workflowId,audit);if(result.kind==='missing')throw new ApiError(404,'NOT_FOUND','Workflow not found.');return result;}
+export async function cancelWorkflowState(db:PrismaClient,organizationId:string,workflowId:string,audit:Parameters<typeof cancelWorkflow>[2]){const result=await cancelWorkflow(db,organizationId,workflowId,audit);if(!result)throw new ApiError(409,'CONFLICT','Workflow cannot be cancelled from its current state.');return result;}
