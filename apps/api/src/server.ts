@@ -10,7 +10,7 @@ const taskStatuses = ['PENDING','READY','RUNNING','WAITING_APPROVAL','BLOCKED','
 function bodyStatus(body: Record<string, unknown>, allowed: readonly string[]): string { if (typeof body.status !== 'string' || !allowed.includes(body.status)) throw new ApiError(422, 'VALIDATION_ERROR', 'status is invalid.'); return body.status; }
 async function route(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) {
   const method = req.method ?? 'GET'; const p = routeParts(req.url ?? '/');
-  if (p.length === 1 && p[0] === 'health' && method === 'GET') return writeJson(res, 200, { status: 'ok', service: 'founder-os-api' });
+  if (p.length === 1 && p[0] === 'health' && method === 'GET') return writeJson(res, 200, { status: 'ok', service: 'leo-os-api' });
   if (p[0] !== 'v1') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
   const body = ['POST','PATCH','PUT'].includes(method) ? await readJson(req) : {};
   if (p[1] === 'objectives') {
@@ -36,4 +36,4 @@ async function route(req: import('node:http').IncomingMessage, res: import('node
   throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
 }
 const server = createServer(async (req, res) => { try { await route(req, res); } catch (error) { writeJson(res, error instanceof ApiError ? error.status : 500, errorBody(error)); } });
-server.listen(port, () => console.log(`Founder OS API listening on :${port}`));
+server.listen(port, () => console.log(`LEO OS API listening on :${port}`));
