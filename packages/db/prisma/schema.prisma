@@ -219,7 +219,7 @@ model TaskDependency {
 }
 
 model AuditEvent {
-  id             String      @id
+  id             String      @id @default(cuid())
   organizationId String
   actorId        String?
   actorType      ActorType
