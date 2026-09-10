@@ -1,6 +1,6 @@
 # LEO OS — Phase 2 Implementation Boundary
 
-**Status:** SLICE #1 IMPLEMENTED — INTENT → PLAN PROPOSAL ONLY
+**Status:** SLICE #1 VERIFIED / CERTIFIED — INTENT → PLAN PROPOSAL ONLY
 **Phase 1:** Frozen and certified
 **Phase 2 rule:** Agents propose. LEO OS decides. Authorized workers execute.
 
@@ -89,7 +89,39 @@ No new policy engine was introduced.
 
 No approval record is created by proposal generation.
 
-## 7. Explicitly not implemented
+## 7. Verification / certification evidence
+
+Step 5 was verified at commit `6642718852663d5bfa4a2e1c00436d987133bed5`.
+
+The repository's existing GitHub Actions V1.09 certification workflow executed against that exact commit as Run #163 / Run ID `34499670595` and completed successfully. The workflow checked out the exact Step 5 commit and executed both historical regression and complete Phase 1 certification gates.
+
+The verified pipeline included:
+
+- PostgreSQL schema generation and validation;
+- migration deployment and database smoke verification;
+- workspace typecheck;
+- workspace lint;
+- workspace build;
+- all core, DB, API and worker unit tests;
+- DB integration tests, including V1.07, V1.08 and V1.09 runtime/concurrency suites;
+- the V1.07/V1.08 historical regression gate;
+- the complete V1.01–V1.09 certification gate after a clean database reset.
+
+The Step 5 core tests were included in the core unit suite. The exact Step 5 cases covering OwnerIntent, deterministic proposal generation, proposal-only authority, approval-required semantics, graph rejection, organization isolation, and proposal metadata all passed in the CI run.
+
+The CI run reported:
+
+```text
+core unit tests:       30/30 passed
+DB unit tests:         33/33 passed
+API unit tests:         9/9 passed
+Worker unit tests:      5/5 passed
+DB integration:        21/21 passed
+```
+
+The workflow completed with overall `SUCCESS` and no failed or skipped verification step.
+
+## 8. Explicitly not implemented
 
 This slice does **not** implement:
 
@@ -109,12 +141,18 @@ This slice does **not** implement:
 - automatic workflow/job creation or execution from a proposal;
 - a shadow orchestrator, dispatcher or worker path.
 
-## 8. Compatibility rule for the next slices
+## 9. Compatibility rule for the next slices
 
 Future intelligence may replace the deterministic planner implementation, but it must emit the same governed proposal boundary or a separately reviewed compatible contract. It must not gain execution authority through the intelligence layer.
 
 Every future Phase 2 change must preserve the Phase 1 compatibility contract, including durable state, deterministic task ordering/readiness, idempotency, organization isolation, approval integrity, capability enforcement, audit, retry/recovery, cancellation, concurrency correctness, worker authorization, result validation and terminal-state protection.
 
-## 9. Rollback
+## 10. Rollback
 
 Slice #1 is additive. Removing its three core modules and their exports/tests leaves the existing Phase 1 control plane and execution path structurally intact. No database migration or API change is required to roll it back.
+
+## 11. Certification decision
+
+**PHASE 2 SLICE #1 — VERIFIED/CERTIFIED**
+
+Certification is limited to the governed Owner Intent → Plan Proposal boundary described above. This certification does not certify any future model, CEO reasoning, memory, employee, delegation, integration, or external execution capability.
