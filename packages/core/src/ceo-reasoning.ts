@@ -1,6 +1,7 @@
 import type { ModelProvider, ModelRequest, ModelResponse } from './model.js';
 import type { OwnerIntent } from './intent.js';
-import type { ModelPlanOutput, PlanProposal } from './model-plan-adapter.js';
+import type { ModelPlanOutput } from './model-plan-adapter.js';
+import type { PlanProposal } from './plan-proposal.js';
 import { modelResponseToPlanProposal } from './model-plan-adapter.js';
 
 export interface CEOReasoningContext {
@@ -127,10 +128,7 @@ function validateRequest(request: CEOReasoningRequest): void {
  * It has no execution, worker, credential, policy-granting, or external-action API.
  */
 export class CEOReasoningEngine {
-  reason(
-    request: CEOReasoningRequest,
-    model: ModelProvider,
-  ): DecisionProposal {
+  reason(request: CEOReasoningRequest, model: ModelProvider): DecisionProposal {
     validateRequest(request);
 
     const modelRequest: ModelRequest<CEOReasoningModelInput> = {
@@ -154,10 +152,7 @@ export class CEOReasoningEngine {
     }
 
     const output = parseReasoningOutput(response.output);
-    const planResponse: ModelResponse<ModelPlanOutput> = {
-      ...response,
-      output: output.plan,
-    };
+    const planResponse: ModelResponse<ModelPlanOutput> = { ...response, output: output.plan };
     const plan = modelResponseToPlanProposal(request.intent, planResponse);
 
     return {
