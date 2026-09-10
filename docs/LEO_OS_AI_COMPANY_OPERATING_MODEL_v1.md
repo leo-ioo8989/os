@@ -5,6 +5,7 @@
 **Phase 2 Slice #1:** Verified / certified
 **Phase 2 Slice #2:** Verified / certified
 **Phase 2 Slice #3:** Verified / certified bounded proposal/data boundary
+**Phase 2 Slice #4:** Verified / certified governed memory/company-knowledge boundary
 
 > This document defines the intended operating model of LEO OS. It does not imply that every capability described here is currently implemented.
 
@@ -160,7 +161,7 @@ The intended memory model is layered:
 
 Access follows the same organization/business/project and least-privilege boundaries as other data. **Memory does not grant authority.** A fact stored in memory cannot override policy, permissions, approval state, worker identity or control-plane decisions.
 
-Layered memory is a future operating-model target; Phase 1 audit/history is the currently implemented foundation. No vector database or autonomous memory runtime is implied by this document.
+Phase 2 Slice #4 now provides a provider/storage-neutral in-memory governed memory boundary with organization/scope checks, provenance/versioning, and a facts-only context adapter for CEO reasoning. Durable layered memory remains a future target; Phase 1 audit/history remains the authoritative historical foundation.
 
 ## I. QA
 
@@ -264,10 +265,13 @@ These principles apply even to a future LEO CEO reasoning layer. Intelligence is
 | Owner Intent → PlanProposal boundary | **Currently implemented / Slice #1 certified** |
 | Provider-neutral model abstraction | **Currently implemented / Slice #2 certified** |
 | CEO reasoning / decision intelligence | **Implemented bounded proposal/data boundary / Slice #3 certified** |
+| Governed memory/company-knowledge boundary | **Implemented in-memory domain boundary / Slice #4 certified** |
 | Fixed `AgentDefinition` / `AgentRegistry` domain model | **Currently present; not a dynamic workforce runtime** |
 | Dynamic AI employee lifecycle | **Future target architecture** |
 | Full LEO CEO operating loop | **Future target architecture** |
-| Layered owner/company/business/project memory | **Future target architecture; Phase 1 audit/history is present** |
+| Durable layered owner/company/business/project memory | **Future target architecture; Slice #4 is domain/in-memory only** |
+| Semantic/vector retrieval | **Future target architecture** |
+| Autonomous memory writing | **Not implemented; future governed capability** |
 | AI QA/reviewer orchestration | **Partially implemented foundation; broader runtime future** |
 | Strategy/model switching recovery | **Future target architecture** |
 | Autonomous external communication | **Not implemented; future governed capability** |
@@ -278,6 +282,8 @@ These principles apply even to a future LEO CEO reasoning layer. Intelligence is
 
 This document is a **normative target operating model**, not a claim that LEO OS already operates a complete autonomous AI company. Phase 1 is the certified control-plane foundation; Phase 2 is adding intelligence in separately governed slices.
 
-**Documentation gap closed:** `docs/LEO_OS_AI_COMPANY_OPERATING_MODEL_v1.md` now exists. Its contents do not add runtime authority or implementation dependencies.
+**Documentation gap closed:** `docs/LEO_OS_AI_COMPANY_OPERATING_MODEL_v1.md` exists and now records Slice #4's bounded memory status. Its contents do not add runtime authority or implementation dependencies.
 
 **Slice #3 certification:** GitHub Actions Run #179 / Run ID `34502177746` passed successfully against implementation HEAD `46c6eaef87b523b191b776f23b2bc6b06ab2dc52`.
+
+**Slice #4 certification:** the repository verification pipeline must pass before this slice is treated as certified. The certification report records the actual verification evidence.
