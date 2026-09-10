@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-import { JobRepository } from '@founder-os/db';
+import { PrismaClient, JobRepository } from '@founder-os/db';
 
 const [organizationId, jobId, workerId] = process.argv.slice(2);
 const db = new PrismaClient();
