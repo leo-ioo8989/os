@@ -33,7 +33,7 @@ export async function createObjective(db: PrismaClient, input: CreateObjectiveIn
       successCriteria: input.successCriteria ?? [],
       deadline: input.deadline,
       currentPhase: input.currentPhase,
-      metadata: input.metadata ?? {},
+      metadata: (input.metadata ?? {}) as any,
       actualCost: 0,
     },
   });
