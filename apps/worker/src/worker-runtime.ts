@@ -2,10 +2,150 @@ import type { PrismaClient } from '@founder-os/db';
 import { AUDIT_EVENTS } from '@founder-os/db';
 import { JobService } from './job-service.js';
 import { ExecutionHandlerRegistry, validateHandlerResult } from './execution-handlers.js';
-export type ExecutionRequest={organizationId:string;workerId:string;action:string;target:string;risk:'LOW'|'MEDIUM'|'HIGH'|'CRITICAL';parameters:Record<string,unknown>;environment?:'development'|'staging'|'production';capability:string;credential:string;approvalId?:string};
-export type ExecutionAuthorizer=(request:ExecutionRequest)=>Promise<{decision:'ALLOW'|'DENY'|'REQUIRES_APPROVAL';approvalId?:string;fingerprint?:string}>;export type ApprovalConsumer=(organizationId:string,workerId:string,approvalId:string,intent:ExecutionRequest)=>Promise<unknown>;
-export interface WorkerRuntimeOptions{leaseMs?:number;heartbeatMs?:number;authorizeExecution?:ExecutionAuthorizer;consumeExecutionApproval?:ApprovalConsumer;registry?:ExecutionHandlerRegistry}
-export interface WorkerRunResult{kind:'succeeded'|'failed'|'waiting_approval'|'denied'|'not_claimed'|'not_found'|'invalid';jobId:string;reason?:string}
-function spec(metadata:unknown){if(!metadata||typeof metadata!=='object'||Array.isArray(metadata))return null;const m=metadata as Record<string,unknown>;const handlerId=typeof m.handlerId==='string'?m.handlerId:null,capability=typeof m.capability==='string'?m.capability:null,action=typeof m.action==='string'?m.action:'internal.execute',target=typeof m.target==='string'?m.target:'internal',risk:m.risk==='LOW'||m.risk==='MEDIUM'||m.risk==='HIGH'||m.risk==='CRITICAL'?m.risk:null,parameters=m.parameters&&typeof m.parameters==='object'&&!Array.isArray(m.parameters)?m.parameters as Record<string,unknown>:{};return handlerId&&capability&&risk?{handlerId,capability,action,target,risk,parameters}:null}
-export class WorkerRuntime{private readonly jobs:JobService;private readonly registry:ExecutionHandlerRegistry;private readonly leaseMs:number;private readonly heartbeatMs:number;constructor(private readonly db:PrismaClient,private readonly options:WorkerRuntimeOptions={}){this.jobs=new JobService(db);this.registry=options.registry??new ExecutionHandlerRegistry();this.leaseMs=options.leaseMs??30000;this.heartbeatMs=options.heartbeatMs??10000}
-async run(organizationId:string,jobId:string,workerId:string,credential:string,approvalId?:string):Promise<WorkerRunResult>{const job=await this.jobs.get(organizationId,jobId);if(!job)return{kind:'not_found',jobId};if(!job.taskId)return{kind:'invalid',jobId,reason:'Job has no task.'};if(job.status!=='QUEUED'&&job.status!=='RETRY_QUEUED'&&!(job.status==='CLAIMED'&&job.workerId===workerId))return{kind:'not_claimed',jobId,reason:`Job is ${job.status}.`};const task=await this.db.task.findFirst({where:{id:job.taskId,objective:{organizationId}}});if(!task)return{kind:'invalid',jobId,reason:'Task is missing or outside the organization.'};const s=spec(task.metadata);if(!s)return{kind:'invalid',jobId,reason:'Invalid task execution specification.'};const h=this.registry.get(s.handlerId);if(!h)return{kind:'denied',jobId,reason:'Unknown execution handler.'};if(h.requiredCapability!==s.capability||h.risk!==s.risk||!h.validateInput(s.parameters))return{kind:'denied',jobId,reason:'Handler policy or input validation failed.'};if(!this.options.authorizeExecution)return{kind:'denied',jobId,reason:'Execution Gateway authorizer is required.'};let claim;if(job.status==='CLAIMED'){await this.jobs.authenticateWorker(organizationId,workerId,credential);claim={kind:'claimed' as const}}else claim=await this.jobs.claimAuthenticated(organizationId,jobId,workerId,credential,this.leaseMs);if(claim.kind!=='claimed')return{kind:'not_claimed',jobId,reason:claim.kind};const started=await this.jobs.start(organizationId,jobId,workerId);if(started.kind!=='updated')return{kind:'not_claimed',jobId,reason:started.kind};await this.jobs.audit(organizationId,AUDIT_EVENTS.JOB_STARTED,'Job',jobId,'handler_started','SUCCESS',{handlerId:h.id});const intent:ExecutionRequest={organizationId,workerId,action:s.action,target:s.target,risk:s.risk as ExecutionRequest['risk'],parameters:s.parameters,environment:'development',capability:s.capability,credential,approvalId};const auth=await this.options.authorizeExecution(intent);if(auth.decision==='REQUIRES_APPROVAL'){await this.jobs.waitForApproval(organizationId,jobId,workerId);return{kind:'waiting_approval',jobId,reason:auth.approvalId}}if(auth.decision!=='ALLOW'){await this.jobs.fail(organizationId,jobId,workerId,'EXECUTION_DENIED','Execution Gateway denied the request.',false);return{kind:'denied',jobId,reason:'Execution Gateway denied execution.'}}if(approvalId){if(!this.options.consumeExecutionApproval){await this.jobs.fail(organizationId,jobId,workerId,'APPROVAL_CONSUMER_MISSING','Approved execution cannot proceed without the approval consumer.',false);return{kind:'denied',jobId,reason:'Approval consumer is required.'}}try{await this.options.consumeExecutionApproval(organizationId,workerId,approvalId,intent)}catch{await this.jobs.fail(organizationId,jobId,workerId,'APPROVAL_INVALID','Approval consumption failed.',false);return{kind:'denied',jobId,reason:'Approval is invalid or already consumed.'}}}let timer:ReturnType<typeof setInterval>|undefined;try{timer=setInterval(()=>{void this.jobs.heartbeat(organizationId,jobId,workerId,this.leaseMs)},this.heartbeatMs);const result=await h.execute({organizationId,workflowId:job.workflowId??'',jobId,taskId:task.id,workerId,parameters:s.parameters,checkpoint:(state)=>this.jobs.checkpoint(organizationId,jobId,workerId,state).then(()=>undefined)});const validation=validateHandlerResult(h,result);if(!validation.valid){await this.jobs.fail(organizationId,jobId,workerId,'INVALID_RESULT',validation.reason,false);return{kind:'failed',jobId,reason:validation.reason}}if(result.status==='FAILED'){const e=result.error!;await this.jobs.fail(organizationId,jobId,workerId,e.code,e.message,e.retryable);return{kind:'failed',jobId,reason:e.code}}const done=await this.jobs.succeed(organizationId,jobId,workerId);if(done.kind!=='updated')return{kind:'failed',jobId,reason:done.kind};await this.jobs.audit(organizationId,AUDIT_EVENTS.JOB_SUCCEEDED,'Job',jobId,'handler_completed','SUCCESS',{handlerId:h.id});return{kind:'succeeded',jobId}}catch(error){const message=error instanceof Error?error.message:'Worker execution failed.';await this.jobs.fail(organizationId,jobId,workerId,'HANDLER_EXCEPTION',message,true);await this.jobs.audit(organizationId,AUDIT_EVENTS.JOB_FAILED,'Job',jobId,'runtime_failed','FAILURE',{handlerId:h.id});return{kind:'failed',jobId,reason:'HANDLER_EXCEPTION'}}finally{if(timer)clearInterval(timer)}}}
+
+export type ExecutionRequest = {
+  organizationId: string;
+  workerId: string;
+  action: string;
+  target: string;
+  risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  parameters: Record<string, unknown>;
+  environment?: 'development' | 'staging' | 'production';
+  capability: string;
+  credential: string;
+  approvalId?: string;
+};
+export type ExecutionAuthorizer = (request: ExecutionRequest) => Promise<{ decision: 'ALLOW' | 'DENY' | 'REQUIRES_APPROVAL'; approvalId?: string; fingerprint?: string }>;
+export type ApprovalConsumer = (organizationId: string, workerId: string, approvalId: string, intent: ExecutionRequest) => Promise<unknown>;
+export interface WorkerRuntimeOptions { leaseMs?: number; heartbeatMs?: number; authorizeExecution?: ExecutionAuthorizer; consumeExecutionApproval?: ApprovalConsumer; registry?: ExecutionHandlerRegistry }
+export interface WorkerRunResult { kind: 'succeeded' | 'failed' | 'waiting_approval' | 'denied' | 'not_claimed' | 'not_found' | 'invalid'; jobId: string; reason?: string }
+
+function spec(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+  const m = metadata as Record<string, unknown>;
+  const handlerId = typeof m.handlerId === 'string' ? m.handlerId : null;
+  const capability = typeof m.capability === 'string' ? m.capability : null;
+  const action = typeof m.action === 'string' ? m.action : 'internal.execute';
+  const target = typeof m.target === 'string' ? m.target : 'internal';
+  const risk = m.risk === 'LOW' || m.risk === 'MEDIUM' || m.risk === 'HIGH' || m.risk === 'CRITICAL' ? m.risk : null;
+  const parameters = m.parameters && typeof m.parameters === 'object' && !Array.isArray(m.parameters) ? (m.parameters as Record<string, unknown>) : {};
+  return handlerId && capability && risk ? { handlerId, capability, action, target, risk, parameters } : null;
+}
+
+export class WorkerRuntime {
+  private readonly jobs: JobService;
+  private readonly registry: ExecutionHandlerRegistry;
+  private readonly leaseMs: number;
+  private readonly heartbeatMs: number;
+
+  constructor(private readonly db: PrismaClient, private readonly options: WorkerRuntimeOptions = {}) {
+    this.jobs = new JobService(db);
+    this.registry = options.registry ?? new ExecutionHandlerRegistry();
+    this.leaseMs = options.leaseMs ?? 30000;
+    this.heartbeatMs = options.heartbeatMs ?? 10000;
+  }
+
+  async run(organizationId: string, jobId: string, workerId: string, credential: string, approvalId?: string): Promise<WorkerRunResult> {
+    const job = await this.jobs.get(organizationId, jobId);
+    if (!job) return { kind: 'not_found', jobId };
+    if (!job.taskId) return { kind: 'invalid', jobId, reason: 'Job has no task.' };
+    if (job.status !== 'QUEUED' && job.status !== 'RETRY_QUEUED' && !(job.status === 'CLAIMED' && job.workerId === workerId)) {
+      return { kind: 'not_claimed', jobId, reason: `Job is ${job.status}.` };
+    }
+
+    const task = await this.db.task.findFirst({ where: { id: job.taskId, objective: { organizationId } } });
+    if (!task) return { kind: 'invalid', jobId, reason: 'Task is missing or outside the organization.' };
+    const s = spec(task.metadata);
+    if (!s) return { kind: 'invalid', jobId, reason: 'Invalid task execution specification.' };
+    const h = this.registry.get(s.handlerId);
+    if (!h) return { kind: 'denied', jobId, reason: 'Unknown execution handler.' };
+    if (h.requiredCapability !== s.capability || h.risk !== s.risk || !h.validateInput(s.parameters)) {
+      return { kind: 'denied', jobId, reason: 'Handler policy or input validation failed.' };
+    }
+    if (!this.options.authorizeExecution) return { kind: 'denied', jobId, reason: 'Execution Gateway authorizer is required.' };
+
+    let claim: { kind: 'claimed' } | { kind: string };
+    if (job.status === 'CLAIMED') {
+      await this.jobs.authenticateWorker(organizationId, workerId, credential);
+      claim = { kind: 'claimed' };
+    } else {
+      claim = await this.jobs.claimAuthenticated(organizationId, jobId, workerId, credential, this.leaseMs);
+    }
+    if (claim.kind !== 'claimed') return { kind: 'not_claimed', jobId, reason: claim.kind };
+
+    const started = await this.jobs.start(organizationId, jobId, workerId);
+    if (started.kind !== 'updated') return { kind: 'not_claimed', jobId, reason: started.kind };
+    await this.jobs.audit(organizationId, AUDIT_EVENTS.JOB_STARTED, 'Job', jobId, 'handler_started', 'SUCCESS', { handlerId: h.id });
+
+    const intent: ExecutionRequest = {
+      organizationId,
+      workerId,
+      action: s.action,
+      target: s.target,
+      risk: s.risk,
+      parameters: s.parameters,
+      environment: 'development',
+      capability: s.capability,
+      credential,
+      approvalId,
+    };
+
+    const auth = await this.options.authorizeExecution(intent);
+    if (auth.decision === 'REQUIRES_APPROVAL') {
+      await this.jobs.waitForApproval(organizationId, jobId, workerId);
+      return { kind: 'waiting_approval', jobId, reason: auth.approvalId };
+    }
+    if (auth.decision !== 'ALLOW') {
+      await this.jobs.fail(organizationId, jobId, workerId, 'EXECUTION_DENIED', 'Execution Gateway denied the request.', false);
+      return { kind: 'denied', jobId, reason: 'Execution Gateway denied execution.' };
+    }
+
+    if (approvalId) {
+      if (!this.options.consumeExecutionApproval) {
+        await this.jobs.fail(organizationId, jobId, workerId, 'APPROVAL_CONSUMER_MISSING', 'Approved execution cannot proceed without the approval consumer.', false);
+        return { kind: 'denied', jobId, reason: 'Approval consumer is required.' };
+      }
+      try {
+        await this.options.consumeExecutionApproval(organizationId, workerId, approvalId, intent);
+      } catch {
+        await this.jobs.fail(organizationId, jobId, workerId, 'APPROVAL_INVALID', 'Approval consumption failed.', false);
+        return { kind: 'denied', jobId, reason: 'Approval is invalid or already consumed.' };
+      }
+    }
+
+    let timer: ReturnType<typeof setInterval> | undefined;
+    try {
+      timer = setInterval(() => { void this.jobs.heartbeat(organizationId, jobId, workerId, this.leaseMs); }, this.heartbeatMs);
+      const result = await h.execute({
+        organizationId,
+        workflowId: job.workflowId ?? '',
+        jobId,
+        taskId: task.id,
+        workerId,
+        parameters: s.parameters,
+        checkpoint: (state) => this.jobs.checkpoint(organizationId, jobId, workerId, state).then(() => undefined),
+      });
+      const validation = validateHandlerResult(h, result);
+      if (!validation.valid) {
+        await this.jobs.fail(organizationId, jobId, workerId, 'INVALID_RESULT', validation.reason, false);
+        return { kind: 'failed', jobId, reason: validation.reason };
+      }
+      if (result.status === 'FAILED') {
+        const e = result.error!;
+        await this.jobs.fail(organizationId, jobId, workerId, e.code, e.message, e.retryable);
+        return { kind: 'failed', jobId, reason: e.code };
+      }
+      const done = await this.jobs.succeed(organizationId, jobId, workerId);
+      if (done.kind !== 'updated') return { kind: 'failed', jobId, reason: done.kind };
+      await this.jobs.audit(organizationId, AUDIT_EVENTS.JOB_SUCCEEDED, 'Job', jobId, 'handler_completed', 'SUCCESS', { handlerId: h.id });
+      return { kind: 'succeeded', jobId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Worker execution failed.';
+      await this.jobs.fail(organizationId, jobId, workerId, 'HANDLER_EXCEPTION', message, true);
+      await this.jobs.audit(organizationId, AUDIT_EVENTS.JOB_FAILED, 'Job', jobId, 'runtime_failed', 'FAILURE', { handlerId: h.id });
+      return { kind: 'failed', jobId, reason: 'HANDLER_EXCEPTION' };
+    } finally {
+      if (timer) clearInterval(timer);
+    }
+  }
+}
