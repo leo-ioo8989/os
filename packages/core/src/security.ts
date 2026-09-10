@@ -1,4 +1,4 @@
-export type RiskLevel = 'GREEN' | 'YELLOW' | 'RED';
+import type { RiskLevel } from './objectives.js';
 
 export type PermissionDecision = 'ALLOW' | 'REQUIRE_APPROVAL' | 'DENY';
 
