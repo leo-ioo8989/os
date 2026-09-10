@@ -10,5 +10,5 @@ export {
   decideExecution,
   EXECUTION_RISK_POLICY,
 } from './execution.js';
-export type { ExecutionDecision, ExecutionIntent } from './execution.js';
+export type { ExecutionDecision, ExecutionIntent, ExecutionRisk } from './execution.js';
 export * from './workflow.js';
