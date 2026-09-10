@@ -4,56 +4,70 @@
 **Audit date:** 2026-09-10  
 **Repository:** `haeshitsa/firsy`  
 **Branch:** `main`  
-**Version target:** V1.08
+**Version target:** V1.09 final Phase-1 certification
 
 ## INTERNAL / PRIVATE STATUS
-LEO OS is a private internal operating system intended to run the founder's company workflows on a local/private environment. It is not a public SaaS product. No public deployment or external integration work is in scope.
+LEO OS is a private internal operating system intended to run company workflows on a local/private environment. It is not a public SaaS product. No public deployment or external integration work is in scope.
 
-## V1.07 STATUS
-V1.07 source-level Workflow↔Job coordination remains implemented. **V1.07 — IMPLEMENTED, RUNTIME VERIFICATION BLOCKED.** The verification environment exists, but live PostgreSQL/Prisma/test execution remains pending.
+## PHASE 1 STATUS
+V1.01 through V1.09 control-plane milestones are implemented. **Phase 1 — CERTIFIED WITH DOCUMENTED LIMITATIONS.**
 
-## V1.08 IMPLEMENTED
-V1.08 adds a deterministic callable Orchestrator, workflow Job bootstrap repository, deterministic Job Dispatcher, controlled Worker Runtime, internal test-safe Handler Registry and deterministic result validation. It reuses V1.05/V1.06/V1.07 Job, Worker, Execution Gateway, Approval, retry, checkpoint, audit and workflow boundaries.
+## V1.09 CERTIFICATION
+The completed certification reference is GitHub Actions **run #132**, commit `a71938e8a5c505d3a80ea17f7a1e4d06016c6656`. The run passed the complete configured V1.09 verification path on disposable PostgreSQL 16.
 
-## V1.08 COMPONENTS
-- `apps/worker/src/orchestrator.ts`
-- `apps/worker/src/job-dispatcher.ts`
-- `apps/worker/src/worker-runtime.ts`
-- `apps/worker/src/execution-handlers.ts`
-- `packages/db/src/workflow-runtime-repository.ts`
-- `docs/V1.08_ORCHESTRATOR_WORKER_RUNTIME.md`
-- V1.08 worker and PostgreSQL integration test harnesses.
+A later process-test strengthening commit `2cacd48969274bd7ac5cdb8d34d6e8b51c69bc58` adds an explicit second-process reclaim assertion after real process termination. Its CI run was queued after the completed #132 certification evidence and must be treated as additional evidence, not retroactively substituted for #132.
 
-## RUNTIME EXECUTION
-No V1.08 runtime command was successfully executed in this session. Tests and integration harnesses are committed but are not represented as passed.
+## VERIFIED CONTROL-PLANE AREAS
+- PostgreSQL 16 clean-database migration and schema validation.
+- Prisma generation and validation.
+- TypeScript typecheck, lint and applicable workspace build.
+- Core workflow/job/task graph invariants.
+- Authentication/session and RBAC boundaries.
+- Organization-scoped repositories and durable mutations.
+- Worker credentials, suspension/revocation and capability enforcement.
+- Durable Job lifecycle, retry timing, exhaustion and terminal protection.
+- Workflow bootstrap, deterministic task selection and terminal reconciliation.
+- Approval binding, lifecycle, single-use and restart-safe reconciliation.
+- Checkpoint versioning, ownership, resumable state and secret redaction.
+- PostgreSQL concurrency behavior and deterministic conflict handling.
+- Execution Gateway risk policy for LOW/MEDIUM/HIGH/CRITICAL.
+- Controlled Handler Registry and result validation.
+- Full Orchestrator→Dispatcher→Worker Runtime→Gateway→Handler→Validation→Workflow completion path.
+- Real worker-process interruption and stale-lease recovery.
+- Recursive audit secret redaction.
 
-## SECURITY HARDENING
-Source review identified and fixed an expired Worker lease transition gap: owned Job transitions now reject expired leases. No external action capability was added.
+## TEST EVIDENCE
+Run #132 results:
+- Core: 16/16 passed.
+- DB: 29/29 passed.
+- API: 9/9 passed.
+- Worker: 5/5 passed.
+- DB integration: 17/17 passed.
+- Workspace build: passed.
+- Typecheck: passed.
+- Lint: passed.
+- PostgreSQL migrations: 9/9 passed.
+- PostgreSQL smoke: passed.
 
-## NOT VERIFIED
-- Live PostgreSQL/Prisma execution.
-- Complete V1.07 runtime verification.
-- V1.08 end-to-end Objective→Workflow→Task→Job→Worker→Gateway→Handler→Validation→Completion runtime path.
-- V1.08 concurrency races.
-- Crash/restart/reconciliation runtime behavior.
-- Approval substitution/replay/consumption runtime behavior.
-- Cross-organization and forged-reference runtime security tests.
-- Failure-injection rollback behavior.
-- Successful CI run.
+The run also passed the real two-task orchestrator E2E and real process interruption test.
 
-## BLOCKED
-**POSTGRESQL RUNTIME VERIFICATION BLOCKED**
-
-The current execution environment lacks Docker/pnpm/psql and cannot clone the private repository into a local runtime checkout. No production or external database was contacted.
+## DOCUMENTED LIMITATIONS
+- Exhaustive route-by-route API status permutation testing is not independently certified.
+- Exhaustive individual HTTP cross-organization permutations are not independently enumerated; lower repository/service and worker boundaries are verified.
+- Process interruption is real process-level testing, but does not kill a process at every possible instruction boundary of every handler.
+- V1.07 remains covered by regression testing but its separate historical standalone certification remains distinct.
+- CI PostgreSQL uses trust authentication because it is a disposable isolated test service; this is not a production credential configuration.
 
 ## CURRENT TRUTHFUL STATUS
-**V1.08 — IMPLEMENTED, RUNTIME VERIFICATION BLOCKED**
+**PHASE 1 — CERTIFIED WITH DOCUMENTED LIMITATIONS.**
 
-## NEXT DEPENDENCY
-Execute the committed PostgreSQL environment and run the complete V1.07/V1.08 runtime, concurrency, recovery, security and failure-injection suites before considering V1.08 verified. Do not start V1.09 or Phase 2.
+This status is evidence-based and does not claim that every theoretical failure permutation was simulated.
 
 ## PHASE BOUNDARY
-V1.08 does **not** implement AI agents, LLM/model providers, GitHub, Gmail/Google Workspace, Instagram/Meta, Google Drive, Google Calendar, MCP, n8n, browser/computer use, external APIs, autonomous external actions or Command Center UI.
+No AI agents, LLM/model providers, MCP, GitHub integration, Gmail/Google Workspace, Instagram/Meta, Google Drive, Google Calendar, n8n, browser/computer use, external APIs, external messaging, autonomous external actions, external deployment, or Founder Command Center UI were introduced.
 
 ## NAMING / COMPATIBILITY NOTES
-Product identity is `LEO OS`. Existing `@founder-os/*` namespaces and historical database/migration identifiers remain compatibility identifiers and are intentionally not cosmetically renamed.
+Product identity is `LEO OS`. Existing `@founder-os/*` namespaces, historical migration/database identifiers and `founder_os_session` remain compatibility identifiers and are intentionally preserved.
+
+## NEXT STEP
+No V1.10 or Phase 2 work is started by this certification. Any future phase must be separately authorized after this final Phase-1 gate.
