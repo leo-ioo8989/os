@@ -6,6 +6,7 @@ import { ExecutionHandlerRegistry, validateHandlerResult } from './execution-han
 export type ExecutionRequest = {
   organizationId: string;
   workerId: string;
+  jobId?: string;
   action: string;
   target: string;
   risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -66,10 +67,10 @@ export class WorkerRuntime {
 
     let claim: { kind: 'claimed' } | { kind: string };
     if (job.status === 'CLAIMED') {
-      await this.jobs.authenticateWorker(organizationId, workerId, credential);
+      try { await this.jobs.authenticateWorker(organizationId, workerId, credential); } catch { return { kind: 'not_claimed', jobId, reason: 'Worker authentication failed.' }; }
       claim = { kind: 'claimed' };
     } else {
-      claim = await this.jobs.claimAuthenticated(organizationId, jobId, workerId, credential, this.leaseMs);
+      try { claim = await this.jobs.claimAuthenticated(organizationId, jobId, workerId, credential, this.leaseMs); } catch { return { kind: 'not_claimed', jobId, reason: 'Worker authentication failed.' }; }
     }
     if (claim.kind !== 'claimed') return { kind: 'not_claimed', jobId, reason: claim.kind };
 
@@ -80,6 +81,7 @@ export class WorkerRuntime {
     const intent: ExecutionRequest = {
       organizationId,
       workerId,
+      jobId,
       action: s.action,
       target: s.target,
       risk: s.risk,
@@ -90,9 +92,19 @@ export class WorkerRuntime {
       approvalId,
     };
 
-    const auth = await this.options.authorizeExecution(intent);
+    let auth: Awaited<ReturnType<NonNullable<WorkerRuntimeOptions['authorizeExecution']>>>;
+    try {
+      auth = await this.options.authorizeExecution(intent);
+    } catch {
+      await this.jobs.fail(organizationId, jobId, workerId, 'EXECUTION_AUTHORIZATION_FAILED', 'Execution Gateway authorization failed.', true);
+      return { kind: 'failed', jobId, reason: 'EXECUTION_AUTHORIZATION_FAILED' };
+    }
     if (auth.decision === 'REQUIRES_APPROVAL') {
-      await this.jobs.waitForApproval(organizationId, jobId, workerId);
+      if (!auth.approvalId) {
+        await this.jobs.fail(organizationId, jobId, workerId, 'APPROVAL_REFERENCE_MISSING', 'Execution Gateway did not return an approval reference.', false);
+        return { kind: 'failed', jobId, reason: 'APPROVAL_REFERENCE_MISSING' };
+      }
+      await this.jobs.waitForApproval(organizationId, jobId, workerId, auth.approvalId);
       return { kind: 'waiting_approval', jobId, reason: auth.approvalId };
     }
     if (auth.decision !== 'ALLOW') {
@@ -100,13 +112,14 @@ export class WorkerRuntime {
       return { kind: 'denied', jobId, reason: 'Execution Gateway denied execution.' };
     }
 
-    if (approvalId) {
+    const effectiveApprovalId = approvalId ?? auth.approvalId;
+    if (effectiveApprovalId) {
       if (!this.options.consumeExecutionApproval) {
         await this.jobs.fail(organizationId, jobId, workerId, 'APPROVAL_CONSUMER_MISSING', 'Approved execution cannot proceed without the approval consumer.', false);
         return { kind: 'denied', jobId, reason: 'Approval consumer is required.' };
       }
       try {
-        await this.options.consumeExecutionApproval(organizationId, workerId, approvalId, intent);
+        await this.options.consumeExecutionApproval(organizationId, workerId, effectiveApprovalId, { ...intent, approvalId: effectiveApprovalId });
       } catch {
         await this.jobs.fail(organizationId, jobId, workerId, 'APPROVAL_INVALID', 'Approval consumption failed.', false);
         return { kind: 'denied', jobId, reason: 'Approval is invalid or already consumed.' };
