@@ -59,6 +59,7 @@ test('V1.07 PostgreSQL schema and organization-scoped idempotency', async () => 
     assert.equal(blockedEnum[0]?.exists, true);
   } finally {
     await db.auditEvent.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
+    await db.job.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
     await db.organization.deleteMany({ where: { id: { in: [orgA.id, orgB.id] } } });
   }
 });
@@ -66,6 +67,7 @@ test('V1.07 PostgreSQL schema and organization-scoped idempotency', async () => 
 test('workflow advancement creates a durable non-null idempotency key', async () => {
   const organization = await db.organization.create({ data: { name: marker } });
   let objectiveId: string | undefined;
+  let workflowId: string | undefined;
   try {
     const objective = await db.objective.create({
       data: {
@@ -100,6 +102,7 @@ test('workflow advancement creates a durable non-null idempotency key', async ()
         resumableState: {},
       },
     });
+    workflowId = workflow.id;
     const job = await db.job.create({
       data: {
         organizationId: organization.id,
@@ -115,12 +118,13 @@ test('workflow advancement creates a durable non-null idempotency key', async ()
     });
     await db.workflow.update({ where: { id: workflow.id }, data: { currentJobId: job.id } });
 
-    const result = await db.$transaction(async (tx) =>
-      advanceWorkflowAfterJobSuccess(tx, organization.id, workflow.id, job.id, {
-        organizationId: organization.id,
-        actorType: 'SYSTEM',
-        result: 'SUCCESS',
-      }),
+    const result = await db.$transaction(
+      (tx) =>
+        advanceWorkflowAfterJobSuccess(tx, organization.id, workflow.id, job.id, {
+          organizationId: organization.id,
+          actorType: 'SYSTEM',
+          result: 'SUCCESS',
+        }),
       { isolationLevel: 'Serializable' },
     );
 
@@ -131,6 +135,7 @@ test('workflow advancement creates a durable non-null idempotency key', async ()
     assert.ok(nextJob?.idempotencyKey);
   } finally {
     await db.auditEvent.deleteMany({ where: { organizationId: organization.id } });
+    if (workflowId) await db.workflow.delete({ where: { id: workflowId } });
     if (objectiveId) await db.objective.delete({ where: { id: objectiveId } });
     await db.organization.delete({ where: { id: organization.id } });
   }
