@@ -1,97 +1,91 @@
 # FOUNDER OS — CURRENT STATE
 
-**Audit date:** 2026-09-10
-**Repository:** `haeshitsa/firsy`
-**Branch:** `main`
-**Version target:** V1.03
+**Audit date:** 2026-09-10  
+**Repository:** `haeshitsa/firsy`  
+**Branch:** `main`  
+**Version target:** V1.04
 
 ## CURRENT ARCHITECTURE
 
-Founder OS is being evolved incrementally from the V0.1 foundation. The control plane now has PostgreSQL/Prisma persistence for organizations, users, memberships, sessions, objectives, tasks and dependencies. The API boundary resolves persistent sessions, organization membership and the shared core RBAC matrix before calling organization-scoped control-plane services.
+Founder OS remains an incremental Phase 1 control plane. The persistence boundary is now:
 
-Current flow:
-Founder → authenticated API context → organization membership/RBAC → control-plane service → Prisma/PostgreSQL.
+API → authentication/context → RBAC → service → repository → Prisma/PostgreSQL.
+
+Deterministic objective/task/dependency rules remain in `packages/core`. Repository mutations use serializable Prisma transactions where a control-plane mutation must atomically persist state plus its audit event.
 
 ## IMPLEMENTED
 
-- Strict TypeScript monorepo foundation.
-- Deterministic GREEN/YELLOW/RED permission primitive.
-- Objective and task domain contracts.
-- Deterministic dependency graph validation, cycle detection, ready/blocked analysis and execution-wave discovery.
-- Common 21-agent registry.
-- PostgreSQL/Prisma control-plane schema and migration foundation.
-- Persistent User, Membership and Session models.
-- Existing scrypt password hashing and SHA-256 session-token hashing preserved.
-- Session authentication for Bearer tokens and the `founder_os_session` cookie.
-- Reusable authenticated organization context and shared RBAC enforcement.
-- Organization-scoped Objective API: create, list, retrieve, update, status transition and delete.
-- Organization-scoped Task API: create, list, retrieve, update, status transition and delete.
-- Task dependency API with existing `packages/core` graph validation for self, duplicate, missing-reference and cycle rejection.
-- Bounded JSON request parsing and non-sensitive consistent API error responses.
-- Agent assignment validation against the existing agent registry.
-- API/core/db TypeScript test-runner configuration.
-- Authentication/RBAC and dependency test suites added.
+- Existing V1.03 authentication, organization context and RBAC preserved.
+- Dedicated `ControlPlaneRepository` for Objective/Task/Dependency persistence.
+- Serializable transaction boundary for important Objective/Task/Dependency mutations.
+- Mutation + audit-event atomicity for repository-backed control-plane writes.
+- Typed audit event vocabulary and persistent `AuditEvent` model.
+- Organization-scoped audit indexes and foreign keys.
+- Recursive audit metadata redaction for credential-like keys.
+- Persistent `Approval` model and repository with lifecycle transitions.
+- Organization-scoped approval service foundation with existing RBAC checks and requester self-approval prevention.
+- Persistent `Workflow` model and repository with resumable state, retry count, failure fields and lifecycle transitions.
+- Additive V1.04 Prisma migration for audit, approval and workflow persistence.
+- V1.04 invariant tests for approval transitions, workflow transitions and audit redaction.
 
-## NOT VERIFIED
+## TRANSACTION BOUNDARIES
 
-- PostgreSQL connectivity, Prisma client generation and migrations have not been executed in a live environment from this session.
-- API integration tests against a real PostgreSQL database have not been executed.
-- GitHub Actions has not provided a verified successful CI run in this session.
-- Runtime production deployment, TLS, rate limiting and infrastructure secret management are not verified.
+- Objective create/update/status/delete: state mutation and corresponding audit event are one serializable transaction.
+- Task create/update/status/delete: state mutation and corresponding audit event are one serializable transaction.
+- Dependency add/remove: relationship mutation and audit event are one serializable transaction; dependency creation performs the existing `packages/core` graph validation inside that transaction before insert.
+- Approval create/decision: approval state and audit event are one serializable transaction.
+- Workflow create/update: workflow state and audit event are one serializable transaction.
 
-## SECURITY BOUNDARIES
+Pre-read authorization and domain validation remain above the repository. Database-scoped predicates are retained on mutations to reduce IDOR/TOCTOU exposure.
 
-- Organization ownership is derived from authenticated membership, never from an objective/task payload.
-- Resource queries include organization scope; task resources additionally scope through their parent objective.
-- A supplied organization header is only a selector among organizations the authenticated user actually belongs to.
-- Multiple memberships require explicit selection; an unrecognized organization is rejected.
-- Roles are checked through the existing core permission matrix rather than endpoint-specific ad hoc role logic.
-- Authentication failures do not reveal whether a session exists.
-- API errors do not expose database errors, stack traces, credentials or tokens.
-- Dependency writes validate the complete graph before persistence.
+## AUDIT
 
-## API SURFACE
+Audit events are organization-scoped and include actor type, event type, resource, action, result and safe metadata. Event vocabulary is centralized in `packages/db/src/audit.ts`. Passwords, tokens, secrets, API keys, credentials, cookies and private-key-like fields are redacted from audit metadata.
 
-- `GET /health`
-- `GET /v1/objectives`
-- `POST /v1/objectives`
-- `GET /v1/objectives/:objectiveId`
-- `PATCH /v1/objectives/:objectiveId`
-- `DELETE /v1/objectives/:objectiveId`
-- `POST /v1/objectives/:objectiveId/status`
-- `GET /v1/objectives/:objectiveId/tasks`
-- `POST /v1/objectives/:objectiveId/tasks`
-- `GET /v1/tasks/:taskId`
-- `PATCH /v1/tasks/:taskId`
-- `DELETE /v1/tasks/:taskId`
-- `POST /v1/tasks/:taskId/status`
-- `POST /v1/tasks/:taskId/dependencies`
-- `DELETE /v1/tasks/:taskId/dependencies/:dependencyId`
+## APPROVALS
 
-## RBAC
+Statuses: `PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`, `CANCELLED`.
+Only `PENDING` approvals can transition. Expired pending approvals are persisted as `EXPIRED`. The service requires the existing `approval:decide` permission for decisions and rejects requester self-approval.
 
-- FOUNDER: full existing permission matrix.
-- ADMIN: administrative/project permissions defined by the existing matrix; no founder-control permission.
-- OPERATOR: execution-oriented objective/task/workflow/tool permissions defined by the existing matrix.
-- VIEWER: read-only objective/task/audit permissions defined by the existing matrix.
+This is persistence/control logic only; there is no Approval Center UI and no external action execution.
 
-No new role or permission category was invented for V1.03.
+## WORKFLOW STATE
 
-## REMAINING LIMITATIONS
+Statuses: `PENDING`, `RUNNING`, `WAITING_APPROVAL`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`.
+Workflow records retain current state/task, resumable JSON state, retry count, failure information and timestamps. This is a durable state foundation, not an autonomous orchestrator.
 
-- API service code currently sits in `apps/api/src/control-plane.ts`; a dedicated repository boundary should be introduced before the API grows further.
-- Objective/task status transition policy is implemented locally in the API service and should eventually be centralized as a shared domain policy.
-- Dependency mutation uses a transaction-safe database boundary as the next hardening step; current graph validation prevents invalid single-writer mutations but live concurrency has not been verified.
-- No autonomous workflow execution should be enabled yet.
-- External integrations remain `PENDING CREDENTIALS`/`PLANNED`; none are connected.
+## DATABASE INTEGRITY
 
-## NEXT PRIORITIES
+The V1.04 migration is additive. Existing foreign keys and organization indexes are preserved; new AuditEvent, Approval and Workflow tables use organization foreign keys with restrictive organization deletion behavior. Composite approval/dependency uniqueness and existing relationship constraints remain database-enforced.
 
-1. Harden the repository/service boundary and transactional control-plane mutations, including dependency writes.
-2. Add durable audit records and API-level security/event logging.
-3. Add approval persistence and founder-control primitives before any privileged execution gateway.
-4. Add durable workflow/job state and restart-safe orchestration.
-5. Only then begin model/tool provider and external integration layers.
+## TEST STATUS
+
+**IMPLEMENTED:** V1.04 repository/domain-foundation tests were added.  
+**NOT VERIFIED:** tests were not executed from this session because no repository shell/Prisma runtime or verified CI execution is available. Live PostgreSQL connectivity, Prisma generation, migration application and integration tests remain unverified.
+
+## SECURITY REVIEW
+
+- Organization IDs remain derived from authenticated membership; repositories require explicit organization scope.
+- Approval reads/writes are organization-scoped at the service/repository boundary.
+- Approval decisions require the existing RBAC permission and cannot be made by the requester.
+- Audit records are append-only through repository APIs; no public audit mutation API exists.
+- Audit metadata is sanitized for credential-like fields.
+- Dependency graph validation remains in `packages/core`; it is not duplicated in the database/API.
+- Serializable transactions reduce concurrent dependency/state race risk, but live concurrency behavior is **NOT VERIFIED** until PostgreSQL execution is available.
+- No external integrations or AI execution were introduced.
+
+## REMAINING LIMITATIONS / TECHNICAL DEBT
+
+- Prisma client generation and live migrations are not verified.
+- Repository integration tests against PostgreSQL are not verified.
+- Status policies still exist in the API service and should eventually move into a shared deterministic domain policy in `packages/core`.
+- Authentication security-event audit coverage is not yet wired into the request path.
+- Approval/workflow persistence has no public API surface yet; it is intentionally a backend foundation for the next control-plane step.
+- Retry/idempotency keys for external durable jobs are not yet implemented because external execution is out of scope for V1.04.
+
+## NEXT PRIORITY
+
+Add durable audit/security-event coverage to the authenticated API and then establish the persistent job/workflow execution boundary needed for restart-safe orchestration. Do not begin external integrations or model/agent execution yet.
 
 ## STATUS VOCABULARY
 
