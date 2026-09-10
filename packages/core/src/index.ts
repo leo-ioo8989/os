@@ -21,3 +21,4 @@ export * from './ceo-reasoning.js';
 export * from './memory.js';
 export * from './model-runtime.js';
 export * from './leo-executive.js';
+export * from './workforce.js';
