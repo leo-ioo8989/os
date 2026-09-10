@@ -1,5 +1,5 @@
 {
-  "name": "@leo-os/core",
+  "name": "@founder-os/core",
   "private": true,
   "type": "module",
   "scripts": {"typecheck": "tsc --noEmit", "lint": "tsc --noEmit", "test": "tsx --test"},
