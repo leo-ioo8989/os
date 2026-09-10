@@ -1,4 +1,4 @@
-name: LEO OS V1.08 Verification
+name: LEO OS V1.09 Certification
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  verification:
+  certification:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -42,5 +42,5 @@ jobs:
         run: corepack enable && corepack prepare pnpm@10.15.0 --activate
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: V1.08 verification path
-        run: pnpm verify:v108
+      - name: V1.09 certification path
+        run: pnpm verify:v109
