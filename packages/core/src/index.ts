@@ -18,3 +18,4 @@ export * from './plan-validation.js';
 export * from './model.js';
 export * from './model-plan-adapter.js';
 export * from './ceo-reasoning.js';
+export * from './memory.js';
