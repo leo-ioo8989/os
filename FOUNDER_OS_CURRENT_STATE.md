@@ -7,82 +7,85 @@
 
 ## CURRENT ARCHITECTURE
 
-The repository currently contains the intended monorepo direction and a small executable API boundary. The documented target architecture is Next.js/React web, Fastify API, TypeScript workers with pg-boss, PostgreSQL/Prisma, provider-agnostic AI adapters, connector adapters, session/RBAC auth, object storage abstraction, and observability hooks.
+Founder OS is being evolved from the existing V0.1 monorepo foundation. The verified tree now contains V1.01 pure domain contracts for objectives, task/dependency graphs, and agents, plus the first durable PostgreSQL/Prisma control-plane package. The API remains a minimal raw Node HTTP boundary pending service routes.
 
-The verified implementation is materially earlier than that target: the repository tree currently contains only `.env.example`, `.gitignore`, `PROJECT-STATE.md`, `README.md`, one API package/server, the core package with a deterministic permission primitive, workspace/TypeScript configuration, and the V0.1 specification. There are no verified web app, worker, database, auth, registry, orchestrator, task graph, memory, approval, audit, model router, MCP, integration, validation, budget, or notification implementations in the current tree.
+Current intended flow remains:
+Founder → Command Center → CEO/Orchestrator → Objective → Planning → Task Graph → Agent Workforce → Model/Tool Gateway → Permission/Approval → Execution → Validation → Audit/Memory → continuation.
 
 ## COMPLETED
 
-- V0.1 architecture/specification documentation exists.
-- PNPM workspace and strict TypeScript base configuration exist.
-- Root development/build/typecheck/lint/test script contracts exist.
-- Environment template and Git ignore rules exist.
-- `packages/core` exists with a deterministic GREEN/YELLOW/RED baseline permission contract.
-- `apps/api` exists with a minimal `/health` HTTP boundary.
-- Persistent project-state documentation exists.
+- V0.1 architecture/specification documentation.
+- PNPM workspace and strict TypeScript configuration.
+- Root development/build/typecheck/lint/test script contracts.
+- Environment template and Git ignore rules.
+- Deterministic GREEN/YELLOW/RED baseline permission primitive.
+- Objective domain contract and lifecycle statuses.
+- Deterministic task/dependency graph with reference validation, duplicate-edge/self-dependency checks, cycle detection, ready/blocked analysis, and execution-wave discovery.
+- Common Agent Registry contract with all 21 initial agent identities.
+- Core exports consolidated through `packages/core/src/index.ts`.
+- `packages/db` introduced with Prisma/PostgreSQL datasource, shared Prisma client, control-plane models for organizations/objectives/tasks/dependencies, and the first migration.
+- Persistent project-state documentation.
 
 ## PARTIALLY IMPLEMENTED
 
-- **Permission system:** only the baseline deterministic primitive exists; full authentication, authorization, risk, budget, approval, execution and audit chain is absent.
-- **API:** executable health endpoint only; no objective/task/workflow APIs.
-- **Monorepo:** package directories described in README are not all present in the verified repository tree.
-- **Tooling:** root scripts reference recursive package commands, but the corresponding application/package implementations are largely absent.
-- **Architecture documentation:** V0.1 exists, but no verified V1.01 implementation/state audit existed before this file.
+- **Persistence:** schema and migration foundation exist, but database connectivity, deployment, repositories/services, and runtime persistence tests are not yet verified.
+- **Permission system:** deterministic baseline exists; authentication, authorization, tool gateway, approvals, budgets, and audit enforcement are absent.
+- **API:** executable `/health` endpoint only; no objective/task/workflow APIs.
+- **Monorepo:** web and worker applications remain absent from the verified tree.
+- **Agent system:** registry/definitions exist, but no execution runtime or model/tool bindings exist.
 
 ## MISSING
 
-- Persistent PostgreSQL/Prisma database and migrations.
 - Authentication and RBAC.
-- Objective engine and persistent objective lifecycle.
-- Real task/dependency graph with cycle detection and ready/blocked calculation.
+- Objective/task persistence repositories and application services.
 - Durable workflow/job execution and restart recovery.
-- CEO/orchestrator implementation.
-- Extensible agent registry and initial agent definitions.
-- Model provider abstraction/router implementation.
-- Tool registry and MCP layer.
-- Permission enforcement around actual tool execution.
+- CEO/orchestrator runtime.
+- Model provider abstraction and model router.
+- Tool registry and MCP execution layer.
+- Permission gateway around real tool execution.
 - Persistent Approval Center with automatic resume.
-- Company/decision memory and semantic retrieval.
+- Company/decision memory and retrieval.
 - Immutable audit/observability pipeline.
 - Retry/failure/validation/budget engines.
 - Integration Center and provider connectors.
 - Founder Command Center web application.
-- CI/test infrastructure and meaningful automated test coverage.
+- CI and meaningful automated test coverage.
 - Founder emergency controls and notification architecture.
 
 ## BROKEN / NOT VERIFIED
 
 - No verified production-ready runtime exists yet.
-- The README's claimed web/worker/database architecture is documentation, not currently represented by matching files in the repository tree.
-- `apps/api` is a raw Node HTTP server rather than the documented Fastify application.
-- Root `dev` filtering expects app packages beyond the currently verified API package.
-- Root `build`, `typecheck`, `lint`, and `test` scripts cannot be considered green until all referenced workspace packages and dependencies are actually present and installed.
+- No external integration should be reported as connected; credentials have not been configured.
+- Root recursive scripts still need all workspace packages and dependencies to be installed/validated together.
+- The documented Fastify API target is not implemented; current server is intentionally still the minimal raw Node boundary.
+- Tests have not been executed through a verified GitHub Actions run in this session; no successful CI result is being claimed.
 
 ## TECHNICAL DEBT
 
-- Foundation is ahead of implementation documentation but behind the V1.01 control-plane requirements.
-- Domain contracts need to become versioned, reusable primitives before persistence and orchestration are layered on top.
-- API boundary should be migrated to the documented framework only when routes/services are ready, avoiding a premature rewrite.
-- Tests, CI, formatting and dependency pinning need to be established alongside executable features.
+- Add a lockfile and CI once package dependency installation is wired.
+- Add database repository/service boundaries rather than coupling routes directly to Prisma.
+- Keep domain graph logic pure and use it as the deterministic validation layer around persisted state.
+- Add migration compatibility tests and transactional state-transition rules before autonomous execution is enabled.
+- Avoid adding provider-specific or integration-specific logic to the core domain package.
 
 ## SECURITY RISKS
 
 - No real authentication/authorization boundary is implemented.
-- No persistent secret manager or scoped connector credential system is implemented.
-- Permission checks are not yet enforced at a tool execution gateway because no tool gateway exists.
-- No audit immutability mechanism exists.
-- No production/staging isolation is implemented.
-- No prompt-injection/tool-output trust boundary is implemented.
-- External integrations are not connected; no fake connected state should be introduced.
+- Database schema exists but production credentials/secret management are not implemented.
+- Permission checks are not enforced at an execution gateway yet.
+- Audit immutability is not implemented.
+- Production/staging isolation is not implemented.
+- Prompt-injection/tool-output trust boundaries are not implemented.
+- External integrations are not connected.
 
 ## NEXT PRIORITIES
 
-1. Establish reusable V1.01 domain contracts for objectives, tasks/dependencies, agents, and orchestration decisions.
-2. Implement and test a deterministic dependency-graph engine, including cycle detection and safe ready-state calculation.
-3. Establish PostgreSQL/Prisma persistence and migrations for objectives/tasks as the first durable control-plane state.
-4. Add authentication/RBAC before exposing mutable founder-control APIs.
-5. Build the orchestrator/workflow runtime on top of the persistent graph rather than embedding workflow logic in prompts.
+1. Add persistence repositories and transactional objective/task services over the Prisma schema.
+2. Add authentication/RBAC before exposing mutable founder-control APIs.
+3. Add model/tool registries and a permission-enforced execution gateway.
+4. Add durable workflow state, approvals, retry/validation/budget controls, and autonomous continuation.
+5. Add memory/audit and then provider/integration adapters behind explicit permissions.
 
 ## NEXT AUTOMATIC STEP
 
-Implement the V1.01 task/dependency domain engine and extensible agent contracts in `packages/core`, with deterministic graph validation and ready/blocked state calculation. Then layer durable database persistence for these contracts.
+Implement the application persistence layer for objectives and task/dependency graphs, including transactional creation/state transitions and deterministic graph validation against persisted tasks. Then proceed to authentication/RBAC.
