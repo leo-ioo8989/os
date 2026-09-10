@@ -1,6 +1,8 @@
 # LEO OS — Phase 2 Slice #3 — CEO Reasoning / Decision Intelligence Boundary
 
-**Status:** IMPLEMENTED — VERIFICATION PENDING
+**Status:** VERIFIED / CERTIFIED
+**Certification:** GitHub Actions Run #179 / 34502177746 — SUCCESS
+**Certified implementation HEAD:** `46c6eaef87b523b191b776f23b2bc6b06ab2dc52`
 **Phase 1:** Frozen and certified
 **Phase 2 Slice #1:** Verified / certified
 **Phase 2 Slice #2:** Verified / certified
@@ -242,8 +244,10 @@ Removing `ceo-reasoning.ts`, its export and its focused tests leaves the precedi
 - Dynamic employee lifecycle, memory, delegation runtime and broader policy orchestration remain future work.
 - Full AI-company operating-loop behavior is not certified by this slice.
 
-## 13. Certification rule
+## 13. Certification decision
 
-This document remains **VERIFICATION PENDING** until the repository's actual CI verification completes successfully. Implementation alone is not certification.
+**VERIFIED / CERTIFIED — LIMITED SCOPE.**
 
-Certification, if achieved, will be limited to the CEO reasoning / decision-proposal boundary and its compatibility with the certified proposal/task-graph and Phase 1 control-plane boundaries.
+GitHub Actions Run #179 / Run ID `34502177746` completed successfully against implementation HEAD `46c6eaef87b523b191b776f23b2bc6b06ab2dc52`. The certification gate executed the historical V1.07/V1.08 regression and the complete Phase 1 V1.01–V1.09 certification gate successfully.
+
+Certification is limited to the CEO reasoning / decision-proposal boundary and compatibility with the certified proposal/task-graph and Phase 1 control-plane boundaries. It does not certify real model providers, autonomous execution, AI employees, memory, delegation runtime or external integrations.
