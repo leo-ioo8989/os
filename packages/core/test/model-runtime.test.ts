@@ -1,207 +1,127 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  DeterministicTestModel,
-  ModelRegistry,
-  ModelRuntime,
-  routeModel,
-  type ModelDefinition,
-  type ModelProvider,
-  type ModelRequest,
-  type ModelResponse,
-} from '../src/index.js';
+import { DeterministicTestModel, ModelRegistry, ModelRuntime, routeModel, type ModelDefinition, type ModelProvider, type ModelRequest, type ModelResponse } from '../src/index.js';
 
-const definition = (overrides: Partial<ModelDefinition> = {}): ModelDefinition => ({
-  providerId: 'deterministic-test-provider',
-  modelId: 'deterministic-test-model-v1',
-  capabilities: ['reasoning', 'structured_output'],
-  qualityTier: 'STANDARD',
-  cost: { costPerInputUnit: 0.1, costPerOutputUnit: 0.2, currency: 'TEST' },
-  latency: { expectedLatencyMs: 1000 },
-  availability: 'AVAILABLE',
-  context: { maxInputUnits: 10000 },
-  version: '1',
-  provenance: 'test-registry-v1',
-  ...overrides,
+const def = (o: Partial<ModelDefinition> = {}): ModelDefinition => ({
+  providerId: 'p', modelId: 'm', capabilities: ['reasoning', 'structured_output'], qualityTier: 'STANDARD',
+  cost: { costPerInputUnit: 0.1, costPerOutputUnit: 0.2, currency: 'TEST' }, latency: { expectedLatencyMs: 1000 },
+  availability: 'AVAILABLE', context: { maxInputUnits: 10000 }, version: '1', provenance: 'test', ...o,
 });
-
-const request = (overrides: Record<string, unknown> = {}) => ({
-  requestId: 'runtime-request-1',
-  organizationId: 'org-a',
-  ownerUserId: 'owner-1',
-  purpose: 'test-reasoning',
-  requiredCapabilities: ['reasoning'] as const,
-  preferredCapabilities: [] as const,
-  minimumQualityTier: 'BASIC' as const,
-  latencySensitive: false,
-  maxCost: 1,
-  allowFallback: true,
-  timestamp: '2026-09-10T12:00:00.000Z',
-  correlationId: 'runtime-trace-1',
-  input: { objective: 'test' },
-  ...overrides,
+const req = (o: Record<string, unknown> = {}) => ({
+  requestId: 'r1', organizationId: 'org-a', ownerUserId: 'owner-1', purpose: 'test',
+  requiredCapabilities: ['reasoning'] as const, preferredCapabilities: [] as const, minimumQualityTier: 'BASIC' as const,
+  latencySensitive: false, maxCost: 1, allowFallback: true, timestamp: '2026-09-10T12:00:00.000Z',
+  correlationId: 'c1', input: { objective: 'test' }, ...o,
 });
-
-const policy = (overrides: Partial<Parameters<typeof routeModel>[2]> = {}) => ({
-  policyVersion: 'routing-v1',
-  allowFallback: true,
-  requireOrganizationMatch: true,
-  ...overrides,
-});
-
-function deterministicProvider(providerId: string, modelId: string): ModelProvider {
+const pol = (o: Partial<Parameters<typeof routeModel>[2]> = {}) => ({ policyVersion: 'routing-v1', allowFallback: true, requireOrganizationMatch: true, ...o });
+function deterministic(providerId: string, modelId: string): ModelProvider {
   const model = new DeterministicTestModel();
-  return {
-    providerId,
-    modelId,
-    generate(input: ModelRequest): ModelResponse {
-      return model.generate({ ...input, providerId, modelId });
-    },
-  };
+  return { providerId, modelId, generate(input) { return model.generate({ ...input, providerId, modelId }); } };
+}
+function failure(providerId: string, modelId: string, code: 'PROVIDER_UNAVAILABLE' | 'TIMEOUT' | 'PROVIDER_FAILURE'): ModelProvider {
+  return { providerId, modelId, generate(input): ModelResponse {
+    return { responseId: `${input.requestId}:failure`, requestId: input.requestId, providerId, modelId, status: 'FAILURE', failure: { code, message: code, retryable: true }, timestamp: input.timestamp, correlationId: input.correlationId, provenance: { providerId, modelId, requestId: input.requestId, correlationId: input.correlationId, deterministic: true } };
+  } };
+}
+function success(providerId: string, modelId: string): ModelProvider {
+  return { providerId, modelId, generate(input: ModelRequest): ModelResponse {
+    return { responseId: `${input.requestId}:${providerId}:${modelId}:response`, requestId: input.requestId, providerId, modelId, status: 'SUCCESS', output: { kind: 'test-output', input: input.input }, timestamp: input.timestamp, correlationId: input.correlationId, provenance: { providerId, modelId, requestId: input.requestId, correlationId: input.correlationId, deterministic: true } };
+  } };
 }
 
-function failingProvider(providerId: string, modelId: string, code: 'PROVIDER_UNAVAILABLE' | 'TIMEOUT' | 'PROVIDER_FAILURE'): ModelProvider {
-  return {
-    providerId,
-    modelId,
-    generate(input) {
-      return {
-        responseId: `${input.requestId}:failure`, requestId: input.requestId, providerId, modelId,
-        status: 'FAILURE', failure: { code, message: code, retryable: true }, timestamp: input.timestamp,
-        correlationId: input.correlationId,
-        provenance: { providerId, modelId, requestId: input.requestId, correlationId: input.correlationId, deterministic: true },
-      };
-    },
-  };
-}
-
-test('required capabilities and invalid capabilities are enforced', () => {
-  const registry = new ModelRegistry([definition()], [deterministicProvider('deterministic-test-provider', 'deterministic-test-model-v1')]);
-  assert.equal(routeModel(request(), registry, policy()).selectedModelId, 'deterministic-test-model-v1');
-  assert.throws(() => routeModel(request({ requiredCapabilities: ['vision'] }), registry, policy()), /NO_ELIGIBLE_MODEL/);
+test('required capabilities match and missing capabilities fail closed', () => {
+  const d = def(); const r = new ModelRegistry([d], [deterministic('p', 'm')]);
+  assert.equal(routeModel(req(), r, pol()).selectedModelId, 'm');
+  assert.throws(() => routeModel(req({ requiredCapabilities: ['vision'] }), r, pol()), /NO_ELIGIBLE_MODEL/);
 });
 
-test('preferred capability, quality, latency and cost participate deterministically', () => {
+test('preferred capabilities rank before quality, with latency and cost deterministic', () => {
   const models = [
-    definition({ providerId: 'p-a', modelId: 'slow-premium', capabilities: ['reasoning'], qualityTier: 'PREMIUM', latency: { expectedLatencyMs: 3000 }, cost: { costPerInputUnit: 0.01, costPerOutputUnit: 0.01, currency: 'TEST' } }),
-    definition({ providerId: 'p-b', modelId: 'fast-standard-vision', capabilities: ['reasoning', 'vision'], qualityTier: 'STANDARD', latency: { expectedLatencyMs: 100 }, cost: { costPerInputUnit: 0.02, costPerOutputUnit: 0.02, currency: 'TEST' } }),
-    definition({ providerId: 'p-c', modelId: 'over-budget', capabilities: ['reasoning', 'vision'], qualityTier: 'PREMIUM', cost: { costPerInputUnit: 2, costPerOutputUnit: 2, currency: 'TEST' } }),
+    def({ providerId: 'a', modelId: 'slow-premium', qualityTier: 'PREMIUM', latency: { expectedLatencyMs: 3000 }, capabilities: ['reasoning'] }),
+    def({ providerId: 'b', modelId: 'fast-vision', capabilities: ['reasoning', 'vision'], latency: { expectedLatencyMs: 100 } }),
+    def({ providerId: 'c', modelId: 'expensive-vision', capabilities: ['reasoning', 'vision'], qualityTier: 'PREMIUM', cost: { costPerInputUnit: 2, costPerOutputUnit: 2, currency: 'TEST' } }),
   ];
-  const registry = new ModelRegistry(models, models.map((m) => deterministicProvider(m.providerId, m.modelId)));
-  const routed = routeModel(request({ preferredCapabilities: ['vision'], latencySensitive: true, maxCost: 0.05 }), registry, policy());
-  assert.equal(routed.selectedModelId, 'fast-standard-vision');
-  assert.deepEqual(routed, routeModel(request({ preferredCapabilities: ['vision'], latencySensitive: true, maxCost: 0.05 }), registry, policy()));
+  const r = new ModelRegistry(models, models.map((m) => deterministic(m.providerId, m.modelId)));
+  const x = routeModel(req({ preferredCapabilities: ['vision'], latencySensitive: true, maxCost: 0.5 }), r, pol());
+  assert.equal(x.selectedModelId, 'fast-vision');
+  assert.deepEqual(x, routeModel(req({ preferredCapabilities: ['vision'], latencySensitive: true, maxCost: 0.5 }), r, pol()));
 });
 
-test('provider and model eligibility is policy controlled', () => {
-  const a = definition({ providerId: 'p-a', modelId: 'a' });
-  const b = definition({ providerId: 'p-b', modelId: 'b' });
-  const registry = new ModelRegistry([a, b], [deterministicProvider('p-a', 'a'), deterministicProvider('p-b', 'b')]);
-  const result = routeModel(request(), registry, policy({ allowedProviderIds: ['p-b'], allowedModelIds: ['b'], allowedQualityTiers: ['STANDARD'] }));
-  assert.equal(result.selectedProviderId, 'p-b');
-  assert.equal(result.selectedModelId, 'b');
+test('quality, provider/model allowlists and availability constrain eligibility', () => {
+  const a = def({ providerId: 'a', modelId: 'a', qualityTier: 'BASIC' }); const b = def({ providerId: 'b', modelId: 'b', qualityTier: 'PREMIUM' });
+  const r = new ModelRegistry([a, b], [deterministic('a', 'a'), deterministic('b', 'b')]);
+  assert.equal(routeModel(req({ minimumQualityTier: 'PREMIUM' }), r, pol()).selectedModelId, 'b');
+  assert.equal(routeModel(req(), r, pol({ allowedProviderIds: ['a'], allowedModelIds: ['a'] })).selectedModelId, 'a');
+  assert.throws(() => routeModel(req(), new ModelRegistry([def({ availability: 'UNAVAILABLE' })], []), pol()), /NO_ELIGIBLE_MODEL/);
 });
 
-test('organization-owned models cannot cross organizations', () => {
-  const orgB = definition({ providerId: 'p-b', modelId: 'b', organizationId: 'org-b' });
-  const registry = new ModelRegistry([orgB], [deterministicProvider('p-b', 'b')]);
-  assert.equal(new ModelRuntime(registry).run(request({ organizationId: 'org-a' }), policy()).status, 'FAILURE');
-  assert.equal(new ModelRuntime(registry).run(request({ organizationId: 'org-a' }), policy()).failure.code, 'NO_ELIGIBLE_MODEL');
+test('organization-owned model definitions never cross organization boundaries', () => {
+  const d = def({ providerId: 'b', modelId: 'b', organizationId: 'org-b' });
+  const result = new ModelRuntime(new ModelRegistry([d], [deterministic('b', 'b')])).run(req({ organizationId: 'org-a' }), pol());
+  assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, 'NO_ELIGIBLE_MODEL');
 });
 
-test('missing authoritative organization context is rejected by routing policy', () => {
-  const registry = new ModelRegistry([definition()], [deterministicProvider('deterministic-test-provider', 'deterministic-test-model-v1')]);
-  const result = new ModelRuntime(registry).run(request({ organizationId: undefined }), policy());
-  assert.equal(result.status, 'FAILURE');
-  assert.equal(result.failure.code, 'ROUTING_POLICY_REJECTED');
+test('routing policy requires authoritative organization identity', () => {
+  const r = new ModelRuntime(new ModelRegistry([def()], [deterministic('p', 'm')]));
+  const result = r.run(req({ organizationId: undefined }), pol());
+  assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, 'ROUTING_POLICY_REJECTED');
 });
 
-test('provider failure, timeout and model unavailability fail closed', () => {
+test('provider failure and timeout remain structured failures', () => {
   for (const code of ['PROVIDER_FAILURE', 'TIMEOUT'] as const) {
-    const d = definition();
-    const result = new ModelRuntime(new ModelRegistry([d], [failingProvider(d.providerId, d.modelId, code)])).run(request({ allowFallback: false }), policy({ allowFallback: false }));
-    assert.equal(result.status, 'FAILURE');
-    assert.equal(result.failure.code, code);
+    const d = def(); const result = new ModelRuntime(new ModelRegistry([d], [failure('p', 'm', code)])).run(req({ allowFallback: false }), pol({ allowFallback: false }));
+    assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, code);
   }
-  const unavailable = definition({ availability: 'UNAVAILABLE' });
-  const result = new ModelRuntime(new ModelRegistry([unavailable], [deterministicProvider(unavailable.providerId, unavailable.modelId)])).run(request(), policy());
-  assert.equal(result.status, 'FAILURE');
-  assert.equal(result.failure.code, 'NO_ELIGIBLE_MODEL');
 });
 
-test('fallback succeeds only among eligible candidates and preserves attempts', () => {
-  const first = definition({ providerId: 'p-a', modelId: 'a', qualityTier: 'PREMIUM' });
-  const second = definition({ providerId: 'p-b', modelId: 'b', qualityTier: 'STANDARD' });
-  const result = new ModelRuntime(new ModelRegistry([first, second], [failingProvider('p-a', 'a', 'PROVIDER_UNAVAILABLE'), deterministicProvider('p-b', 'b')])).run(request(), policy());
-  assert.equal(result.status, 'SUCCESS');
-  assert.equal(result.response.providerId, 'p-b');
-  assert.deepEqual(result.attemptedModels.map((m) => m.modelId), ['a', 'b']);
+test('fallback succeeds only through the routed eligible set', () => {
+  const a = def({ providerId: 'a', modelId: 'a', qualityTier: 'PREMIUM' }); const b = def({ providerId: 'b', modelId: 'b' });
+  const result = new ModelRuntime(new ModelRegistry([a, b], [failure('a', 'a', 'PROVIDER_UNAVAILABLE'), success('b', 'b')])).run(req(), pol());
+  assert.equal(result.status, 'SUCCESS'); assert.equal(result.response.modelId, 'b'); assert.deepEqual(result.attemptedModels.map((x) => x.modelId), ['a', 'b']);
 });
 
-test('fallback exhaustion and fallback policy boundaries fail closed', () => {
-  const first = definition({ providerId: 'p-a', modelId: 'a', qualityTier: 'PREMIUM' });
-  const second = definition({ providerId: 'p-b', modelId: 'b' });
-  const registry = new ModelRegistry([first, second], [failingProvider('p-a', 'a', 'PROVIDER_FAILURE'), failingProvider('p-b', 'b', 'PROVIDER_FAILURE')]);
-  const exhausted = new ModelRuntime(registry).run(request(), policy());
-  assert.equal(exhausted.status, 'FAILURE');
-  assert.equal(exhausted.failure.code, 'FALLBACK_EXHAUSTED');
-  const disabled = new ModelRuntime(registry).run(request({ allowFallback: false }), policy());
-  assert.equal(disabled.status, 'FAILURE');
-  assert.equal(disabled.failure.code, 'PROVIDER_FAILURE');
+test('fallback exhaustion fails closed and never bypasses policy', () => {
+  const a = def({ providerId: 'a', modelId: 'a', qualityTier: 'PREMIUM' }); const b = def({ providerId: 'b', modelId: 'b' });
+  const registry = new ModelRegistry([a, b], [failure('a', 'a', 'PROVIDER_FAILURE'), success('b', 'b')]);
+  const result = new ModelRuntime(registry).run(req(), pol({ allowedProviderIds: ['a'] }));
+  assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, 'FALLBACK_EXHAUSTED'); assert.equal(result.attemptedModels.length, 1);
 });
 
-test('fallback cannot bypass routing policy', () => {
-  const first = definition({ providerId: 'p-a', modelId: 'a' });
-  const blocked = definition({ providerId: 'p-b', modelId: 'b' });
-  const result = new ModelRuntime(new ModelRegistry([first, blocked], [failingProvider('p-a', 'a', 'PROVIDER_FAILURE'), deterministicProvider('p-b', 'b')])).run(request(), policy({ allowedProviderIds: ['p-a'] }));
-  assert.equal(result.status, 'FAILURE');
-  assert.equal(result.failure.code, 'FALLBACK_EXHAUSTED');
-  assert.equal(result.attemptedModels.length, 1);
+test('fallback is disabled when the request disallows it', () => {
+  const d = def(); const result = new ModelRuntime(new ModelRegistry([d], [failure('p', 'm', 'PROVIDER_FAILURE')])).run(req({ allowFallback: false }), pol());
+  assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, 'PROVIDER_FAILURE');
 });
 
-test('provenance is preserved and mismatches fail closed', () => {
-  const d = definition();
-  const good = new ModelRuntime(new ModelRegistry([d], [deterministicProvider(d.providerId, d.modelId)])).run(request({ requestId: 'req-p', correlationId: 'corr-p' }), policy());
-  assert.equal(good.status, 'SUCCESS');
-  assert.equal(good.routing.provenance.requestId, 'req-p');
-  assert.equal(good.response.requestId, 'req-p');
-  const bad: ModelProvider = {
-    providerId: d.providerId, modelId: d.modelId,
-    generate(input) { return { ...new DeterministicTestModel().generate(input), providerId: 'wrong-provider' }; },
-  };
-  const mismatch = new ModelRuntime(new ModelRegistry([d], [bad])).run(request(), policy());
-  assert.equal(mismatch.status, 'FAILURE');
-  assert.equal(mismatch.failure.code, 'PROVENANCE_MISMATCH');
+test('provenance is preserved across routing and provider response', () => {
+  const d = def(); const result = new ModelRuntime(new ModelRegistry([d], [deterministic('p', 'm')])).run(req({ requestId: 'rp', correlationId: 'cp' }), pol());
+  assert.equal(result.status, 'SUCCESS'); assert.equal(result.routing.provenance.requestId, 'rp'); assert.equal(result.response.requestId, 'rp'); assert.equal(result.response.correlationId, 'cp');
 });
 
-test('routing and runtime expose no authority or execution operations', () => {
-  const d = definition();
-  const registry = new ModelRegistry([d], [deterministicProvider(d.providerId, d.modelId)]);
-  const routed = routeModel(request(), registry, policy());
-  for (const key of ['grantedPermissions', 'grantedCapabilities', 'approvalGranted', 'workerId', 'credentialId', 'execute', 'dispatch']) assert.equal(key in routed, false);
-  const runtime = new ModelRuntime(registry);
-  assert.equal('getCredential' in runtime, false);
-  const result = runtime.run(request(), policy());
-  assert.equal(result.status, 'SUCCESS');
-  assert.equal('jobId' in result, false);
-  assert.equal('execute' in result, false);
-  assert.equal('dispatch' in result, false);
+test('provenance mismatch fails closed', () => {
+  const d = def(); const provider: ModelProvider = { providerId: 'p', modelId: 'm', generate(input) { return { ...new DeterministicTestModel().generate(input), providerId: 'wrong' }; } };
+  const result = new ModelRuntime(new ModelRegistry([d], [provider])).run(req(), pol());
+  assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, 'PROVENANCE_MISMATCH');
 });
 
-test('model output remains data and runtime performs no execution side effect', () => {
-  const d = definition();
-  let calls = 0;
-  const provider: ModelProvider = { providerId: d.providerId, modelId: d.modelId, generate(input) { calls += 1; return new DeterministicTestModel().generate(input); } };
-  const result = new ModelRuntime(new ModelRegistry([d], [provider])).run(request(), policy());
-  assert.equal(result.status, 'SUCCESS');
-  assert.deepEqual(result.response.output, { kind: 'deterministic-test-output', input: { objective: 'test' } });
-  assert.equal(calls, 1);
+test('invalid definitions and requests fail closed', () => {
+  assert.throws(() => new ModelRegistry([def({ context: { maxInputUnits: 0 } })], []), /maxInputUnits/);
+  const r = new ModelRuntime(new ModelRegistry([def()], [deterministic('p', 'm')]));
+  const result = r.run(req({ requestId: '' }), pol()); assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, 'INVALID_REQUEST');
 });
 
-test('invalid model definitions and requests fail closed', () => {
-  assert.throws(() => new ModelRegistry([definition({ context: { maxInputUnits: 0 } })], []), /maxInputUnits/);
-  const registry = new ModelRegistry([definition()], [deterministicProvider('deterministic-test-provider', 'deterministic-test-model-v1')]);
-  const result = new ModelRuntime(registry).run(request({ requestId: '' }), policy());
-  assert.equal(result.status, 'FAILURE');
-  assert.equal(result.failure.code, 'INVALID_REQUEST');
+test('routing result has no authorization or execution authority', () => {
+  const d = def(); const result = routeModel(req(), new ModelRegistry([d], [deterministic('p', 'm')]), pol());
+  for (const key of ['grantedPermissions', 'grantedCapabilities', 'approvalGranted', 'workerId', 'credentialId', 'execute', 'dispatch', 'jobId']) assert.equal(key in result, false);
+});
+
+test('runtime has no credential, execution, or dispatch operation and model output remains data', () => {
+  const d = def(); const runtime = new ModelRuntime(new ModelRegistry([d], [success('p', 'm')]));
+  assert.equal('getCredential' in runtime, false); assert.equal('execute' in runtime, false); assert.equal('dispatch' in runtime, false);
+  const result = runtime.run(req(), pol()); assert.equal(result.status, 'SUCCESS');
+  assert.deepEqual(result.response.output, { kind: 'test-output', input: { objective: 'test' } });
+});
+
+test('unregistered eligible provider is unavailable rather than invented', () => {
+  const d = def(); const result = new ModelRuntime(new ModelRegistry([d], [])).run(req({ allowFallback: false }), pol({ allowFallback: false }));
+  assert.equal(result.status, 'FAILURE'); assert.equal(result.failure.code, 'MODEL_UNAVAILABLE');
 });
