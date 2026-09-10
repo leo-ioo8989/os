@@ -1,45 +1,12 @@
 import type { Prisma, PrismaClient, WorkflowStatus } from '@prisma/client';
-import { AUDIT_EVENTS, type AuditEventInput } from './audit.js';
-
-export const WORKFLOW_TRANSITIONS: Record<WorkflowStatus, readonly WorkflowStatus[]> = {
-  PENDING: ['RUNNING', 'CANCELLED'],
-  RUNNING: ['WAITING_APPROVAL', 'PAUSED', 'COMPLETED', 'FAILED', 'CANCELLED'],
-  WAITING_APPROVAL: ['RUNNING', 'PAUSED', 'FAILED', 'CANCELLED'],
-  PAUSED: ['RUNNING', 'CANCELLED'],
-  COMPLETED: [], FAILED: ['RUNNING', 'CANCELLED'], CANCELLED: [],
-};
-
-export interface CreateWorkflowInput {
-  organizationId: string;
-  objectiveId?: string;
-  currentState: string;
-  status?: WorkflowStatus;
-  currentTaskId?: string;
-  resumableState?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
+import { AUDIT_EVENTS, sanitizeAuditMetadata, type AuditEventInput } from './audit.js';
+export const WORKFLOW_TRANSITIONS: Record<WorkflowStatus, readonly WorkflowStatus[]> = { PENDING:['RUNNING','CANCELLED'], RUNNING:['WAITING_APPROVAL','PAUSED','COMPLETED','FAILED','CANCELLED'], WAITING_APPROVAL:['RUNNING','PAUSED','FAILED','CANCELLED'], PAUSED:['RUNNING','CANCELLED'], COMPLETED:[], FAILED:['RUNNING','CANCELLED'], CANCELLED:[] };
+export interface CreateWorkflowInput { organizationId:string; objectiveId?:string; currentState:string; status?:WorkflowStatus; currentTaskId?:string; resumableState?:Record<string,unknown>; metadata?:Record<string,unknown>; }
+const json=(v:unknown)=>sanitizeAuditMetadata(v) as Prisma.InputJsonValue;
 export class WorkflowRepository {
-  constructor(private readonly db: PrismaClient) {}
-  async create(input: CreateWorkflowInput, audit: AuditEventInput) {
-    return this.db.$transaction(async (tx) => {
-      const item = await tx.workflow.create({ data: {
-        organization: { connect: { id: input.organizationId } }, objectiveId: input.objectiveId,
-        currentState: input.currentState, status: input.status ?? 'PENDING', currentTaskId: input.currentTaskId,
-        resumableState: input.resumableState ?? {}, metadata: input.metadata ?? {},
-      } });
-      await tx.auditEvent.create({ data: { organization: { connect: { id: input.organizationId } }, actor: audit.actorId ? { connect: { id: audit.actorId } } : undefined, actorType: audit.actorType, eventType: AUDIT_EVENTS.WORKFLOW_CREATED, resourceType: 'Workflow', resourceId: item.id, action: audit.action, result: audit.result, metadata: audit.metadata ?? {} } });
-      return item;
-    }, { isolationLevel: 'Serializable' });
-  }
-  list(organizationId: string) { return this.db.workflow.findMany({ where: { organizationId }, orderBy: { updatedAt: 'desc' } }); }
-  get(organizationId: string, id: string) { return this.db.workflow.findFirst({ where: { organizationId, id } }); }
-  async update(organizationId: string, id: string, data: Prisma.WorkflowUpdateInput, audit: AuditEventInput) {
-    return this.db.$transaction(async (tx) => {
-      const result = await tx.workflow.updateMany({ where: { organizationId, id }, data: data as never });
-      if (result.count !== 1) return null;
-      await tx.auditEvent.create({ data: { organization: { connect: { id: organizationId } }, actor: audit.actorId ? { connect: { id: audit.actorId } } : undefined, actorType: audit.actorType, eventType: AUDIT_EVENTS.WORKFLOW_UPDATED, resourceType: 'Workflow', resourceId: id, action: audit.action, result: audit.result, metadata: audit.metadata ?? {} } });
-      return tx.workflow.findFirst({ where: { organizationId, id } });
-    }, { isolationLevel: 'Serializable' });
-  }
+ constructor(private readonly db:PrismaClient){}
+ async create(input:CreateWorkflowInput,audit:AuditEventInput){return this.db.$transaction(async(tx)=>{const item=await tx.workflow.create({data:{organization:{connect:{id:input.organizationId}},objectiveId:input.objectiveId,currentState:input.currentState,status:input.status??'PENDING',currentTaskId:input.currentTaskId,resumableState:json(input.resumableState??{}),metadata:json(input.metadata??{})}});await tx.auditEvent.create({data:{organization:{connect:{id:input.organizationId}},actor:audit.actorId?{connect:{id:audit.actorId}}:undefined,actorType:audit.actorType,eventType:AUDIT_EVENTS.WORKFLOW_CREATED,resourceType:'Workflow',resourceId:item.id,action:audit.action,result:audit.result,metadata:json(audit.metadata??{})}});return item;},{isolationLevel:'Serializable'});}
+ list(organizationId:string){return this.db.workflow.findMany({where:{organizationId},orderBy:{updatedAt:'desc'}});}
+ get(organizationId:string,id:string){return this.db.workflow.findFirst({where:{organizationId,id}});}
+ async update(organizationId:string,id:string,data:Prisma.WorkflowUpdateInput,audit:AuditEventInput){return this.db.$transaction(async(tx)=>{const result=await tx.workflow.updateMany({where:{organizationId,id},data:data as never});if(result.count!==1)return null;await tx.auditEvent.create({data:{organization:{connect:{id:organizationId}},actor:audit.actorId?{connect:{id:audit.actorId}}:undefined,actorType:audit.actorType,eventType:AUDIT_EVENTS.WORKFLOW_UPDATED,resourceType:'Workflow',resourceId:id,action:audit.action,result:audit.result,metadata:json(audit.metadata??{})}});return tx.workflow.findFirst({where:{organizationId,id}});},{isolationLevel:'Serializable'});}
 }
