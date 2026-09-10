@@ -4,57 +4,56 @@
 **Audit date:** 2026-09-10  
 **Repository:** `haeshitsa/firsy`  
 **Branch:** `main`  
-**Version target:** V1.07
+**Version target:** V1.08
 
 ## INTERNAL / PRIVATE STATUS
-LEO OS is a private internal operating system intended to run the founder's company workflows on a local/private environment. It is not currently a public SaaS product. No public deployment, publishing or external integration work is part of scope.
+LEO OS is a private internal operating system intended to run the founder's company workflows on a local/private environment. It is not a public SaaS product. No public deployment or external integration work is in scope.
 
-## V1.07 IMPLEMENTED
-V1.07 source-level Workflow↔Job coordination remains implemented: durable current-task/current-job pointers, organization-scoped Job idempotency, deterministic next-task selection, atomic success/retry/approval coordination, cancellation, checkpoint-compatible resumability and restart-safe reconciliation.
+## V1.07 STATUS
+V1.07 source-level Workflow↔Job coordination remains implemented. **V1.07 — IMPLEMENTED, RUNTIME VERIFICATION BLOCKED.** The verification environment exists, but live PostgreSQL/Prisma/test execution remains pending.
 
-## VERIFICATION ENVIRONMENT CREATED
-- Disposable PostgreSQL 16 Docker environment: `docker-compose.verification.yml`.
-- Database: `founder_os_test`; local port `55432`; no production credentials.
-- Safe test template: `verification.env.example`.
-- Root verification commands: `db:start`, `db:stop`, `db:reset`, `db:status`, `db:generate`, `db:validate`, `db:migrate`, `db:smoke`, `test:unit`, `test:db`, `test:integration`, `verify:v107`.
-- Initial real-PostgreSQL integration harness: `packages/db/test/v107-runtime.test.ts`.
-- Repository CI: `.github/workflows/v107-verification.yml` with PostgreSQL 16.
-- Full procedure: `docs/V1.07_VERIFICATION_ENVIRONMENT.md`.
+## V1.08 IMPLEMENTED
+V1.08 adds a deterministic callable Orchestrator, workflow Job bootstrap repository, deterministic Job Dispatcher, controlled Worker Runtime, internal test-safe Handler Registry and deterministic result validation. It reuses V1.05/V1.06/V1.07 Job, Worker, Execution Gateway, Approval, retry, checkpoint, audit and workflow boundaries.
 
-## EXECUTED IN THIS SESSION
-Repository audit was performed through the available GitHub interface. A local capability check found Node.js 22 available, but Docker, pnpm and psql unavailable; network access also prevented cloning the private repository into the execution container.
+## V1.08 COMPONENTS
+- `apps/worker/src/orchestrator.ts`
+- `apps/worker/src/job-dispatcher.ts`
+- `apps/worker/src/worker-runtime.ts`
+- `apps/worker/src/execution-handlers.ts`
+- `packages/db/src/workflow-runtime-repository.ts`
+- `docs/V1.08_ORCHESTRATOR_WORKER_RUNTIME.md`
+- V1.08 worker and PostgreSQL integration test harnesses.
 
-No Prisma, PostgreSQL, migration, test, concurrency, recovery, security or CI runtime command was successfully executed in this session.
+## RUNTIME EXECUTION
+No V1.08 runtime command was successfully executed in this session. Tests and integration harnesses are committed but are not represented as passed.
 
-## PASSED
-Environment files and commands were committed. Source-level audit confirms the repository is configured for pnpm 10.15.0, Prisma 6.15.x and PostgreSQL. **No runtime test is represented as passed.**
+## SECURITY HARDENING
+Source review identified and fixed an expired Worker lease transition gap: owned Job transitions now reject expired leases. No external action capability was added.
 
 ## NOT VERIFIED
-- Dependency installation and exact resolved dependency graph; the repository currently has no committed `pnpm-lock.yaml`.
-- Prisma Client generation and schema validation.
-- Complete migration chain on a real PostgreSQL database.
-- Actual V1.07 indexes/constraints, including organization-scoped Job idempotency.
-- Full existing test suite.
-- Complete V1.07 integration path Worker→Job→Execution Gateway→Approval→Workflow.
-- Concurrency: Job claim, completion, advancement, idempotent creation, approval decisions/consumption, leases and checkpoints.
-- Recovery: interrupted/stale/expired jobs, checkpoints, reconciliation, missing currentJobId, approval blocking and terminal states.
-- Security: cross-organization access, forged references, approval substitution/replay, worker lifecycle and checkpoint ownership.
-- Transaction failure injection/rollback.
+- Live PostgreSQL/Prisma execution.
+- Complete V1.07 runtime verification.
+- V1.08 end-to-end Objective→Workflow→Task→Job→Worker→Gateway→Handler→Validation→Completion runtime path.
+- V1.08 concurrency races.
+- Crash/restart/reconciliation runtime behavior.
+- Approval substitution/replay/consumption runtime behavior.
+- Cross-organization and forged-reference runtime security tests.
+- Failure-injection rollback behavior.
 - Successful CI run.
 
 ## BLOCKED
 **POSTGRESQL RUNTIME VERIFICATION BLOCKED**
 
-The verification environment now exists in the repository, but the current session cannot run it because Docker/pnpm/psql are unavailable locally and the private repository cannot be cloned into the execution container because network access is unavailable. No production or external database was contacted.
+The current execution environment lacks Docker/pnpm/psql and cannot clone the private repository into a local runtime checkout. No production or external database was contacted.
 
 ## CURRENT TRUTHFUL STATUS
-**V1.07 — IMPLEMENTED, RUNTIME VERIFICATION BLOCKED**
+**V1.08 — IMPLEMENTED, RUNTIME VERIFICATION BLOCKED**
 
 ## NEXT DEPENDENCY
-Execute the committed environment on a Docker/Node-capable machine or CI runner. Complete runtime integration, concurrency, recovery, security and failure-injection verification before considering V1.08.
+Execute the committed PostgreSQL environment and run the complete V1.07/V1.08 runtime, concurrency, recovery, security and failure-injection suites before considering V1.08 verified. Do not start V1.09 or Phase 2.
 
 ## PHASE BOUNDARY
-V1.07 does **not** implement AI agents, LLM/model providers, GitHub, Gmail, Instagram/Meta, Google Drive, Google Calendar, MCP, n8n, browser/computer use, external APIs, autonomous external actions or Command Center UI.
+V1.08 does **not** implement AI agents, LLM/model providers, GitHub, Gmail/Google Workspace, Instagram/Meta, Google Drive, Google Calendar, MCP, n8n, browser/computer use, external APIs, autonomous external actions or Command Center UI.
 
 ## NAMING / COMPATIBILITY NOTES
 Product identity is `LEO OS`. Existing `@founder-os/*` namespaces and historical database/migration identifiers remain compatibility identifiers and are intentionally not cosmetically renamed.
