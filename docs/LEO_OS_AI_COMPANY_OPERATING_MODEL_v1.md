@@ -4,7 +4,7 @@
 **Phase 1:** Frozen and certified
 **Phase 2 Slice #1:** Verified / certified
 **Phase 2 Slice #2:** Verified / certified
-**Phase 2 Slice #3:** Implemented domain boundary / verification pending
+**Phase 2 Slice #3:** Verified / certified bounded proposal/data boundary
 
 > This document defines the intended operating model of LEO OS. It does not imply that every capability described here is currently implemented.
 
@@ -263,7 +263,7 @@ These principles apply even to a future LEO CEO reasoning layer. Intelligence is
 | Policy/capability/approval execution boundary | **Currently implemented foundation / Phase 1 certified** |
 | Owner Intent → PlanProposal boundary | **Currently implemented / Slice #1 certified** |
 | Provider-neutral model abstraction | **Currently implemented / Slice #2 certified** |
-| CEO reasoning / decision intelligence | **Implemented bounded proposal/data boundary; verification pending** |
+| CEO reasoning / decision intelligence | **Implemented bounded proposal/data boundary / Slice #3 certified** |
 | Fixed `AgentDefinition` / `AgentRegistry` domain model | **Currently present; not a dynamic workforce runtime** |
 | Dynamic AI employee lifecycle | **Future target architecture** |
 | Full LEO CEO operating loop | **Future target architecture** |
@@ -279,3 +279,5 @@ These principles apply even to a future LEO CEO reasoning layer. Intelligence is
 This document is a **normative target operating model**, not a claim that LEO OS already operates a complete autonomous AI company. Phase 1 is the certified control-plane foundation; Phase 2 is adding intelligence in separately governed slices.
 
 **Documentation gap closed:** `docs/LEO_OS_AI_COMPANY_OPERATING_MODEL_v1.md` now exists. Its contents do not add runtime authority or implementation dependencies.
+
+**Slice #3 certification:** GitHub Actions Run #179 / Run ID `34502177746` passed successfully against implementation HEAD `46c6eaef87b523b191b776f23b2bc6b06ab2dc52`.
