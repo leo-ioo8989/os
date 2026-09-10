@@ -20,60 +20,77 @@ enum ObjectiveStatus {
   CANCELLED
 }
 
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum RiskLevel {
-  GREEN
-  YELLOW
-  RED
-}
-
-enum TaskStatus {
-  PENDING
-  READY
-  RUNNING
-  WAITING_APPROVAL
-  BLOCKED
-  FAILED
-  COMPLETED
-  CANCELLED
-}
+enum Priority { LOW MEDIUM HIGH CRITICAL }
+enum RiskLevel { GREEN YELLOW RED }
+enum TaskStatus { PENDING READY RUNNING WAITING_APPROVAL BLOCKED FAILED COMPLETED CANCELLED }
+enum Role { FOUNDER ADMIN OPERATOR VIEWER }
 
 model Organization {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   objectives  Objective[]
+  memberships Membership[]
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  displayName  String?
+  passwordHash String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  sessions     Session[]
+}
+
+model Membership {
+  userId         String
+  organizationId String
+  role           Role       @default(VIEWER)
+  createdAt      DateTime   @default(now())
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, organizationId])
+  @@index([organizationId, role])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastSeenAt   DateTime?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 model Objective {
-  id            String          @id @default(cuid())
+  id             String          @id @default(cuid())
   organizationId String
-  title         String
-  description   String
-  projectId     String?
-  createdBy     String
-  priority      Priority
-  status        ObjectiveStatus @default(DRAFT)
-  riskLevel     RiskLevel       @default(GREEN)
-  budget        Decimal?        @db.Decimal(18, 6)
-  estimatedCost Decimal?        @db.Decimal(18, 6)
-  actualCost    Decimal         @default(0) @db.Decimal(18, 6)
+  title          String
+  description    String
+  projectId      String?
+  createdBy      String
+  priority       Priority
+  status         ObjectiveStatus @default(DRAFT)
+  riskLevel      RiskLevel       @default(GREEN)
+  budget         Decimal?        @db.Decimal(18, 6)
+  estimatedCost  Decimal?        @db.Decimal(18, 6)
+  actualCost     Decimal         @default(0) @db.Decimal(18, 6)
   successCriteria Json
-  deadline      DateTime?
-  createdAt     DateTime        @default(now())
-  startedAt     DateTime?
-  completedAt   DateTime?
-  currentPhase  String?
-  metadata      Json
-  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  tasks         Task[]
+  deadline       DateTime?
+  createdAt      DateTime        @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  currentPhase   String?
+  metadata       Json
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tasks          Task[]
 
   @@index([organizationId, status])
   @@index([organizationId, priority])
@@ -81,25 +98,25 @@ model Objective {
 }
 
 model Task {
-  id            String     @id @default(cuid())
-  objectiveId   String
-  title         String
-  description   String
-  status        TaskStatus @default(PENDING)
+  id              String     @id @default(cuid())
+  objectiveId     String
+  title           String
+  description     String
+  status          TaskStatus @default(PENDING)
   assignedAgentId String?
-  riskLevel     RiskLevel  @default(GREEN)
-  estimatedCost Decimal?   @db.Decimal(18, 6)
-  actualCost    Decimal    @default(0) @db.Decimal(18, 6)
-  retryCount    Int        @default(0)
-  retryLimit    Int        @default(3)
-  metadata      Json
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  startedAt     DateTime?
-  completedAt   DateTime?
-  objective     Objective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
-  dependencies  TaskDependency[] @relation("taskDependencies")
-  dependents    TaskDependency[] @relation("taskDependents")
+  riskLevel       RiskLevel  @default(GREEN)
+  estimatedCost   Decimal?   @db.Decimal(18, 6)
+  actualCost      Decimal    @default(0) @db.Decimal(18, 6)
+  retryCount      Int        @default(0)
+  retryLimit      Int        @default(3)
+  metadata        Json
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+  objective       Objective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  dependencies    TaskDependency[] @relation("taskDependencies")
+  dependents      TaskDependency[] @relation("taskDependents")
 
   @@index([objectiveId, status])
   @@index([assignedAgentId, status])
