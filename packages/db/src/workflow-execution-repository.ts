@@ -14,7 +14,6 @@ async function nextJob(tx: Tx, organizationId: string, workflowId: string, objec
 async function taskGraph(tx: Tx, objectiveId: string) {
   return tx.task.findMany({ where: { objectiveId }, include: { dependencies: { select: { dependencyId: true } } } });
 }
-
 export async function advanceWorkflowAfterJobSuccess(tx: Tx, organizationId: string, workflowId: string, jobId: string, input: AuditBase) {
   const job = await tx.job.findFirst({ where: { id: jobId, organizationId, workflowId } });
   const workflow = await tx.workflow.findFirst({ where: { id: workflowId, organizationId } });
@@ -50,16 +49,17 @@ export async function advanceWorkflowAfterJobSuccess(tx: Tx, organizationId: str
   }
   const candidates = tasks.map(t => ({ id: t.id, status: t.status, dependencies: t.dependencies.map(d => d.dependencyId) }));
   const waitingJobs = await tx.job.findMany({ where: { organizationId, workflowId, status: 'WAITING_APPROVAL' }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 1 });
-  if (waitingJobs[0]) {
-    const waiting = waitingJobs[0];
+  const waiting = waitingJobs[0];
+  if (waiting) {
     await tx.workflow.update({ where: { id: workflowId }, data: { status: 'WAITING_APPROVAL', currentState: 'WAITING_APPROVAL', currentTaskId: waiting.taskId, currentJobId: waiting.id } });
     await writeAudit(tx, input, AUDIT_EVENTS.WORKFLOW_APPROVAL_BLOCKED, 'Workflow', workflowId, 'approval_blocked', { jobId: waiting.id, taskId: waiting.taskId });
     return { kind: 'waiting_approval' as const, jobId: waiting.id };
   }
   const runningJobs = await tx.job.findMany({ where: { organizationId, workflowId, status: { in: ['CLAIMED', 'RUNNING'] } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 1 });
-  if (runningJobs[0]) {
-    await tx.workflow.update({ where: { id: workflowId }, data: { status: 'RUNNING', currentState: 'RUNNING', currentTaskId: runningJobs[0].taskId, currentJobId: runningJobs[0].id } });
-    return { kind: 'waiting_other_jobs' as const, jobId: runningJobs[0].id };
+  const running = runningJobs[0];
+  if (running) {
+    await tx.workflow.update({ where: { id: workflowId }, data: { status: 'RUNNING', currentState: 'RUNNING', currentTaskId: running.taskId, currentJobId: running.id } });
+    return { kind: 'waiting_other_jobs' as const, jobId: running.id };
   }
   const selected = selectNextTask(candidates);
   if (!selected) {
@@ -77,7 +77,6 @@ export async function advanceWorkflowAfterJobSuccess(tx: Tx, organizationId: str
   await writeAudit(tx, input, AUDIT_EVENTS.WORKFLOW_RESUMED, 'Workflow', workflowId, 'resumed', { taskId: selected.id, jobId: queued.id });
   return { kind: 'advanced' as const, taskId: selected.id, jobId: queued.id };
 }
-
 export async function reconcileWorkflow(db: PrismaClient, organizationId: string, workflowId: string, input: AuditBase) {
   return db.$transaction(async tx => {
     const workflow = await tx.workflow.findFirst({ where: { id: workflowId, organizationId } });
@@ -118,7 +117,6 @@ export async function reconcileWorkflow(db: PrismaClient, organizationId: string
     return { kind: 'consistent' as const };
   }, { isolationLevel: 'Serializable' });
 }
-
 export async function cancelWorkflow(db: PrismaClient, organizationId: string, workflowId: string, input: AuditBase) {
   return db.$transaction(async tx => {
     const workflow = await tx.workflow.findFirst({ where: { organizationId, id: workflowId } });
