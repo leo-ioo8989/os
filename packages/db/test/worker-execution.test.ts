@@ -1,0 +1,5 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createWorkerCredential, executionFingerprint, verifyWorkerCredential } from '../src/worker-repository.js';
+test('worker credential verifier never requires plaintext storage',()=>{const raw='worker-secret-credential-123456';const {verifier}=createWorkerCredential(raw);assert.notEqual(verifier,raw);assert.equal(verifyWorkerCredential(raw,verifier),true);assert.equal(verifyWorkerCredential('wrong',verifier),false);});
+test('execution fingerprints bind action parameters',()=>{const a=executionFingerprint({action:'publish',target:'resource-1',parameters:{x:1},risk:'HIGH'});const b=executionFingerprint({action:'publish',target:'resource-1',parameters:{x:2},risk:'HIGH'});const c=executionFingerprint({action:'deploy',target:'resource-1',parameters:{x:1},risk:'HIGH'});assert.notEqual(a,b);assert.notEqual(a,c);assert.equal(a,executionFingerprint({action:'publish',target:'resource-1',parameters:{x:1},risk:'HIGH'}));});
