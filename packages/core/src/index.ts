@@ -15,3 +15,5 @@ export * from './workflow.js';
 export * from './intent.js';
 export * from './plan-proposal.js';
 export * from './plan-validation.js';
+export * from './model.js';
+export * from './model-plan-adapter.js';
