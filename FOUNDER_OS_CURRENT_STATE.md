@@ -3,89 +3,100 @@
 **Audit date:** 2026-09-10  
 **Repository:** `haeshitsa/firsy`  
 **Branch:** `main`  
-**Version target:** V1.04
+**Version target:** V1.05
 
 ## CURRENT ARCHITECTURE
 
-Founder OS remains an incremental Phase 1 control plane. The persistence boundary is now:
+Founder OS remains an incremental Phase 1 control plane:
 
 API → authentication/context → RBAC → service → repository → Prisma/PostgreSQL.
+Worker → job service → repository → Prisma/PostgreSQL.
 
-Deterministic objective/task/dependency rules remain in `packages/core`. Repository mutations use serializable Prisma transactions where a control-plane mutation must atomically persist state plus its audit event.
+Deterministic policies remain in `packages/core`; database state changes and audit events use serializable transaction boundaries where atomicity matters.
 
 ## IMPLEMENTED
 
 - Existing V1.03 authentication, organization context and RBAC preserved.
-- Dedicated `ControlPlaneRepository` for Objective/Task/Dependency persistence.
-- Serializable transaction boundary for important Objective/Task/Dependency mutations.
-- Mutation + audit-event atomicity for repository-backed control-plane writes.
-- Typed audit event vocabulary and persistent `AuditEvent` model.
-- Organization-scoped audit indexes and foreign keys.
-- Recursive audit metadata redaction for credential-like keys.
-- Persistent `Approval` model and repository with lifecycle transitions.
-- Organization-scoped approval service foundation with existing RBAC checks and requester self-approval prevention.
-- Persistent `Workflow` model and repository with resumable state, retry count, failure fields and lifecycle transitions.
-- Additive V1.04 Prisma migration for audit, approval and workflow persistence.
-- V1.04 invariant tests for approval transitions, workflow transitions and audit redaction.
+- Dedicated control-plane repositories preserved.
+- Durable AuditEvent, Approval and Workflow foundations preserved.
+- Central typed audit vocabulary extended with worker/job lifecycle events.
+- Persistent `Job` and `Checkpoint` models added.
+- `JobRepository` added for organization-scoped job CRUD, atomic claim, lease heartbeat, transitions, failure/retry, stale-lease recovery and checkpoint persistence.
+- `JobService` provides the worker-facing service boundary; worker code does not bypass repositories.
+- Deterministic job lifecycle policy added to `packages/core`.
+- Additive V1.05 Prisma migration added for Job and Checkpoint.
+- Job metadata/checkpoint/audit metadata uses existing credential-like redaction.
+- Job parent relationships validate organization ownership before creation.
+- Worker lifecycle audit vocabulary added without creating a second audit system.
 
-## TRANSACTION BOUNDARIES
+## JOB STATE MACHINE
 
-- Objective create/update/status/delete: state mutation and corresponding audit event are one serializable transaction.
-- Task create/update/status/delete: state mutation and corresponding audit event are one serializable transaction.
-- Dependency add/remove: relationship mutation and audit event are one serializable transaction; dependency creation performs the existing `packages/core` graph validation inside that transaction before insert.
-- Approval create/decision: approval state and audit event are one serializable transaction.
-- Workflow create/update: workflow state and audit event are one serializable transaction.
+`QUEUED → CLAIMED → RUNNING → SUCCEEDED`.
 
-Pre-read authorization and domain validation remain above the repository. Database-scoped predicates are retained on mutations to reduce IDOR/TOCTOU exposure.
+Failure paths: `CLAIMED/RUNNING → RETRY_QUEUED` when retryable and attempts remain; otherwise `FAILED`.
+Cancellation is terminal from active/queued states where explicitly permitted.
+Terminal states: `SUCCEEDED`, `FAILED`, `CANCELLED`.
+
+Attempt number increments atomically on claim. Default maximum attempts is 3. Retry scheduling is deterministic and currently immediately eligible (`nextRetryAt = now`); no exponential backoff is introduced.
+
+## WORKER CLAIM / LEASE
+
+A claim is organization-scoped and performed in a serializable transaction. Only queued/retry-queued jobs can be claimed; claim atomically records worker ID, increments attempt number and establishes a lease. Heartbeats can only extend a live lease owned by the same worker.
+
+Stale `CLAIMED`/`RUNNING` jobs with expired leases can be recovered into `RETRY_QUEUED` or terminal `FAILED` according to the attempt limit. This gives the persistence layer deterministic restart recovery state; it is not a continuously running recovery daemon.
+
+Worker identity is supplied by the worker process and is not treated as a user authorization credential. Future production deployment must provision authenticated worker identities before untrusted workers are allowed to operate.
+
+## CHECKPOINTS
+
+Checkpoints are organization-scoped, job-scoped, monotonically versioned per job and persisted transactionally with the job's resumable state update and audit event. Only the owning active worker can create one. Credential-like metadata keys are redacted before persistence.
+
+## FAILURE / RETRY
+
+Failures persist code, sanitized message, retryable flag, attempt count, next retry time and terminal completion time when exhausted. Retry count cannot loop indefinitely because `attemptNumber >= maxAttempts` deterministically produces `FAILED`.
 
 ## AUDIT
 
-Audit events are organization-scoped and include actor type, event type, resource, action, result and safe metadata. Event vocabulary is centralized in `packages/db/src/audit.ts`. Passwords, tokens, secrets, API keys, credentials, cookies and private-key-like fields are redacted from audit metadata.
-
-## APPROVALS
-
-Statuses: `PENDING`, `APPROVED`, `REJECTED`, `EXPIRED`, `CANCELLED`.
-Only `PENDING` approvals can transition. Expired pending approvals are persisted as `EXPIRED`. The service requires the existing `approval:decide` permission for decisions and rejects requester self-approval.
-
-This is persistence/control logic only; there is no Approval Center UI and no external action execution.
-
-## WORKFLOW STATE
-
-Statuses: `PENDING`, `RUNNING`, `WAITING_APPROVAL`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`.
-Workflow records retain current state/task, resumable JSON state, retry count, failure information and timestamps. This is a durable state foundation, not an autonomous orchestrator.
+Existing durable AuditEvent infrastructure is extended with job creation, claim, start, checkpoint, failure, retry scheduling, resume, success, cancellation and stale-lease recovery events. Audit records remain organization-scoped and credential-like metadata is redacted. No raw passwords, session tokens, API keys or private keys are persisted by the worker layer.
 
 ## DATABASE INTEGRITY
 
-The V1.04 migration is additive. Existing foreign keys and organization indexes are preserved; new AuditEvent, Approval and Workflow tables use organization foreign keys with restrictive organization deletion behavior. Composite approval/dependency uniqueness and existing relationship constraints remain database-enforced.
+V1.05 is additive. `Job` has organization, optional objective/task/workflow foreign keys and indexes for queue, worker, lease and resource lookup. `Checkpoint` has organization/job foreign keys, a `(jobId, version)` uniqueness constraint and organization/job index. No destructive migration was introduced.
 
 ## TEST STATUS
 
-**IMPLEMENTED:** V1.04 repository/domain-foundation tests were added.  
-**NOT VERIFIED:** tests were not executed from this session because no repository shell/Prisma runtime or verified CI execution is available. Live PostgreSQL connectivity, Prisma generation, migration application and integration tests remain unverified.
+**IMPLEMENTED:** job lifecycle/retry tests and worker metadata-redaction tests were added.  
+**NOT VERIFIED:** tests, Prisma generation, PostgreSQL connectivity, migration application and real concurrent worker claims were not executed from this session because no runnable repository shell/Prisma runtime or verified CI execution is available.
 
 ## SECURITY REVIEW
 
-- Organization IDs remain derived from authenticated membership; repositories require explicit organization scope.
-- Approval reads/writes are organization-scoped at the service/repository boundary.
-- Approval decisions require the existing RBAC permission and cannot be made by the requester.
-- Audit records are append-only through repository APIs; no public audit mutation API exists.
-- Audit metadata is sanitized for credential-like fields.
-- Dependency graph validation remains in `packages/core`; it is not duplicated in the database/API.
-- Serializable transactions reduce concurrent dependency/state race risk, but live concurrency behavior is **NOT VERIFIED** until PostgreSQL execution is available.
+- All job reads and mutations require organization scope in the repository.
+- Job creation verifies optional objective/task/workflow parents belong to the same organization.
+- Claim, heartbeat, transition, failure and checkpoint operations bind active ownership to `workerId`.
+- Stale takeover requires an expired lease and is serialized with the state change.
+- Terminal jobs cannot resume through the core transition policy.
+- Checkpoint and audit metadata are sanitized for credential-like keys.
+- Database uniqueness protects checkpoint version duplication; job IDs are globally unique.
+- Serializable transactions reduce race conditions, but PostgreSQL concurrency behavior remains **NOT VERIFIED**.
+- Worker identity authentication/attestation is intentionally deferred until the production execution gateway is introduced.
 - No external integrations or AI execution were introduced.
+
+## API SECURITY / AUDIT COVERAGE
+
+The authenticated API already enforces membership and RBAC before control-plane services. The existing audit vocabulary now includes security events, but authentication/authorization failures are not universally persisted because the current AuditEvent schema requires an organization and failed authentication may not establish a trusted organization context. This avoids inventing or trusting an attacker-supplied organization solely to create an audit row.
 
 ## REMAINING LIMITATIONS / TECHNICAL DEBT
 
-- Prisma client generation and live migrations are not verified.
-- Repository integration tests against PostgreSQL are not verified.
-- Status policies still exist in the API service and should eventually move into a shared deterministic domain policy in `packages/core`.
-- Authentication security-event audit coverage is not yet wired into the request path.
-- Approval/workflow persistence has no public API surface yet; it is intentionally a backend foundation for the next control-plane step.
-- Retry/idempotency keys for external durable jobs are not yet implemented because external execution is out of scope for V1.04.
+- Prisma client generation and live migrations remain NOT VERIFIED.
+- Real PostgreSQL repository, transaction and concurrency tests remain NOT VERIFIED.
+- Worker polling/queue scheduling is intentionally not implemented; V1.05 provides the durable execution boundary, not an autonomous worker loop.
+- Worker identity authentication/attestation and execution authorization belong to the future privileged execution gateway.
+- API job endpoints are intentionally not exposed yet; future API exposure must use Auth/RBAC → service → repository.
+- Workflow/job idempotency keys are deferred until an actual durable execution command/event contract exists.
 
 ## NEXT PRIORITY
 
-Add durable audit/security-event coverage to the authenticated API and then establish the persistent job/workflow execution boundary needed for restart-safe orchestration. Do not begin external integrations or model/agent execution yet.
+Harden durable security-event recording where a trusted organization context exists, then add the privileged execution/approval gateway foundation and restart-safe workflow-to-job coordination. Keep AI execution, external integrations and Command Center out of scope.
 
 ## STATUS VOCABULARY
 
