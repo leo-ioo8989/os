@@ -25,6 +25,6 @@ export function hasWorkerCapability(worker: WorkerCapabilitySet, capability: str
 }
 export function decideExecution(risk: ExecutionRisk, capabilityAllowed: boolean, approvalValid = false): ExecutionDecision {
   if (!capabilityAllowed || risk === 'CRITICAL') return 'DENY';
-  if (risk === 'HIGH' && !approvalValid) return 'REQUIRES_APPROVAL';
+  if (risk === 'HIGH') return approvalValid ? 'ALLOW' : 'REQUIRES_APPROVAL';
   return EXECUTION_RISK_POLICY[risk];
 }
