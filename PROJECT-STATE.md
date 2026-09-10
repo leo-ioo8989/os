@@ -2,89 +2,74 @@
 
 **Product:** LEO OS — Leadership & Execution Operating System  
 **Last updated:** 2026-09-10  
-**Current version:** V1.05
+**Current version:** V1.06
 
 ## INTERNAL / PRIVATE STATUS
-LEO OS is currently an internal/private operating system intended to run the founder's company workflows. It is not currently a public SaaS product. No public deployment, publishing or external integration work is part of the current scope.
+LEO OS is a private internal operating system intended to run the founder's company/workflows on a local/private environment. It is not currently a public SaaS product. No public deployment or external integration work is in scope.
 
 ## CURRENT PHASE
-Phase 1 control-plane reliability: durable audit/security coverage → persistent worker/job boundary → restart-safe state.
+Phase 1 control-plane reliability and trusted execution infrastructure.
 
 ## IMPLEMENTED
 - V1.03 authentication, organization isolation and RBAC preserved.
 - V1.04 repository boundaries, transactional mutations, durable audit/approval/workflow foundations preserved.
-- Deterministic job lifecycle policy added to `packages/core`.
-- Persistent Job and Checkpoint models added with additive Prisma migration.
-- `JobRepository` provides organization-scoped job access, atomic claiming, worker leases, heartbeats, transitions, failure/retry persistence, stale-lease recovery and checkpoints.
-- `JobService` provides the worker-facing service boundary; worker code does not access Prisma directly.
-- Job creation validates optional objective/task/workflow relationships against the same organization.
-- Job/checkpoint/audit metadata is sanitized for credential-like keys.
-- Worker lifecycle audit events use the existing durable AuditEvent system.
-- Job attempt count and maximum attempts prevent infinite retry loops.
-- Terminal job states cannot resume through the deterministic core policy.
-- Worker entrypoint remains a minimal persistence-boundary process; no autonomous execution loop was introduced.
-- External integrations, AI providers and Command Center remain untouched.
-- Product identity is now LEO OS; architecture and implementation boundaries are unchanged.
+- V1.05 durable Job/Checkpoint execution boundary preserved.
+- Trusted Worker identity with `ACTIVE`, `SUSPENDED`, `REVOKED` lifecycle.
+- Secure worker credentials using Node scrypt verifier material, rotation, expiration and revocation.
+- Worker authentication is separate from human sessions and organization-scoped.
+- Explicit worker capabilities and permission profiles.
+- Central Execution Gateway with deterministic `ALLOW`, `DENY`, `REQUIRES_APPROVAL` decisions.
+- Deterministic LOW/MEDIUM/HIGH/CRITICAL execution risk policy.
+- SHA-256 execution fingerprints bind action, target, sanitized parameters, risk and environment.
+- Existing Approval domain extended with fingerprint, policy version, worker requester binding, expiration and single-use consumption.
+- Durable `WAITING_APPROVAL` job state and deterministic approved/rejected continuation.
+- Workflow↔Job repository coordination and same-organization job linkage/summary.
+- Existing AuditEvent system extended with worker, execution and workflow/job events.
+- Additive V1.06 Prisma migration; no destructive database rename/drop.
 
-## JOB STATE MACHINE
-`QUEUED → CLAIMED → RUNNING → SUCCEEDED`.
-Failure: `CLAIMED/RUNNING → RETRY_QUEUED` when retryable and attempts remain; otherwise `FAILED`.
-Queued/active work may be cancelled according to the repository transition boundary. `SUCCEEDED`, `FAILED`, `CANCELLED` are terminal.
+## STATE OWNERSHIP
+Workflow owns workflow lifecycle/current state/current task. Job owns execution attempt/lease/retry/approval-blocked/resumable execution state. Task owns task/dependency state. Approval owns human authorization state and never executes actions.
 
-## WORKER / LEASE DESIGN
-Claim occurs inside a serializable transaction and atomically assigns `workerId`, increments `attemptNumber`, records heartbeat and sets `leaseExpiresAt`. Heartbeats require the same worker identity and a live lease. Expired active leases can be recovered deterministically into `RETRY_QUEUED` or `FAILED` according to attempt limits.
+## WORKER SECURITY
+A worker must authenticate with a credential; worker ID alone is insufficient. Credential verifier material is persisted, never plaintext. Suspended/revoked workers cannot authenticate or claim/continue privileged work. Existing owned jobs are not silently continued under a revoked identity.
 
-## CHECKPOINT / RESUMPTION DESIGN
-Checkpoints are versioned per job with a database uniqueness constraint on `(jobId, version)`. The checkpoint and job resumable state update are atomic with their audit event. Only the current worker owning an active lease may checkpoint. A future worker can reconstruct resumable state from the job plus latest checkpoint; terminal jobs are not resumable.
+## EXECUTION GATEWAY
+All future privileged actions are intended to pass through worker authentication → organization isolation → capability check → risk policy → approval policy → durable audit. The gateway currently authorizes/blocks only; it performs no external action.
 
-## RETRY / FAILURE POLICY
-Attempts increment on claim. Default maximum attempts is 3. Retryable failures schedule immediate eligibility via `nextRetryAt`; permanent failures or exhausted attempts become terminal `FAILED`. No arbitrary exponential backoff or infinite retry loop exists.
+## APPROVAL
+HIGH-risk actions require a durable approval bound to organization, requester worker, action fingerprint and policy version. CRITICAL actions are denied by the current Phase 1 gateway. Approval is separate from execution. A matching approved approval can be consumed once by its requesting worker; mismatched, expired, rejected or already-consumed approvals cannot authorize another action.
+
+## WORKFLOW / JOB
+Jobs can be linked to workflows with organization validation. A running job can enter durable `WAITING_APPROVAL`; approval resolution places it into `RETRY_QUEUED`, while rejection produces terminal `FAILED`. Workflow summaries expose active, queued, completed, failed, retryable, blocked and resumable jobs without duplicating job state.
 
 ## AUDIT
-Audit vocabulary includes job creation, claim, start, checkpoint, failure, retry scheduling, resume, success, cancellation and stale-lease recovery. Security events already have centralized vocabulary. Authentication failures without trusted organization context are not force-written to organization audit rows, avoiding attacker-controlled organization attribution.
+Existing durable AuditEvent remains the only audit system. V1.06 adds worker authentication/lifecycle, execution decision, approval and workflow/job coordination events. Recursive sensitive-key redaction remains in use. Credentials, tokens, API keys and private keys are not stored in these event payloads.
+
+## DATABASE
+V1.06 migration: `packages/db/prisma/migrations/20260910170000_v106_trusted_worker_execution/migration.sql`. Additive changes: Worker, WorkerCredential, WorkerStatus, approval binding/consumption fields, Job WAITING_APPROVAL and optional Job→Worker FK/indexes. **Migration application is NOT VERIFIED.**
 
 ## TESTED
-- Test source added for job lifecycle transitions, retry exhaustion, terminal-state protection and credential redaction.
-- Naming/identity changes were applied without database schema/table/column renames.
+Test source added for deterministic execution policy, explicit capabilities, worker credential verification and execution fingerprint binding. Existing V1.05 job tests remain. No external integration or autonomous execution tests were added.
 
 ## NOT VERIFIED
 - Tests were NOT executed in this session.
 - Prisma client generation is NOT VERIFIED.
 - PostgreSQL connectivity and migration application are NOT VERIFIED.
-- Real repository CRUD, transaction rollback and concurrent worker-claim behavior are NOT VERIFIED.
-- No successful GitHub Actions CI run has been verified.
+- Real transaction isolation/concurrent approval consumption/worker claim behavior is NOT VERIFIED.
+- End-to-end worker authentication → gateway → approval → job execution is NOT VERIFIED.
+- No successful CI run has been verified.
 
 ## SECURITY REVIEW
-- Job reads/mutations require organization predicates.
-- Optional parent objective/task/workflow references are verified within the same organization before job creation.
-- Worker ownership is required for heartbeat, active transition, failure and checkpoint operations.
-- Stale lease recovery is serialized and requires an actually expired lease.
-- Checkpoint version duplication is database-protected.
-- Audit/checkpoint metadata redacts credential-like fields.
-- No public job API or external execution capability was added, limiting current attack surface.
-- Worker identity is not yet cryptographically authenticated; that is required before untrusted workers are allowed to execute privileged work.
-- Serializable concurrency behavior remains NOT VERIFIED without PostgreSQL execution.
+Threats reviewed: forged identity, stolen/replayed credential, cross-org access, privilege escalation, impersonation, approval forgery/reuse, self-approval, stale approval, revoked-worker execution, IDOR, secret leakage and gateway bypass. Mitigations are implemented at the deterministic repository/service boundary. Live concurrency/security verification remains NOT VERIFIED.
 
-## BLOCKED / NOT VERIFIED
-- Nothing in the V1.05 code boundary is intentionally blocked.
-- Live database verification is NOT VERIFIED because a runnable PostgreSQL/Prisma environment is unavailable in this session.
-- External integrations remain PENDING CREDENTIALS/PLANNED and intentionally untouched.
+## BLOCKED / LIMITATIONS
+Nothing is intentionally blocked in the source-level V1.06 design. Live database verification is unavailable in this session. Worker transport/remote attestation and autonomous polling remain intentionally deferred.
 
-## REMAINING TECHNICAL DEBT
-- Add API-level job endpoints only after defining their RBAC contract.
-- Add authenticated worker identity/attestation before privileged execution.
-- Add durable idempotency keys when an actual execution command/event contract exists.
-- Add a recovery/polling loop only when the durable execution/orchestrator phase begins.
-- Eventually centralize all status policies in `packages/core`.
-
-## NEXT PRIORITY
-V1.05 remains the active dependency: durable worker/job execution boundary + restart-safe workflow resumption. The next technical step within Phase 1 remains trusted security-event persistence and the privileged execution/approval gateway, followed by workflow↔job coordination. Keep AI execution, external integrations and Command Center out of scope.
+## NEXT DEPENDENCY
+V1.06 completes the trusted worker/execution gateway foundation. The next Phase 1 dependency is **workflow/orchestrator coordination hardening and real PostgreSQL/concurrency verification** before any autonomous execution capability is considered. Phase 2 integrations, AI providers, MCP and Command Center remain out of scope.
 
 ## STATUS VOCABULARY
 IMPLEMENTED · CONNECTED · CONFIGURED · PENDING CREDENTIALS · PLANNED · BLOCKED · NOT VERIFIED
 
-## NAMING / COMPATIBILITY NOTES
-- Product identity is `LEO OS` / `LEO_OS` / `leo-os` / `leo_os` according to context.
-- Existing `@founder-os/*` package namespaces are intentionally retained as stable internal technical identifiers to avoid an unnecessary dependency-graph rename during this identity-only change.
-- Existing database naming is intentionally unchanged for compatibility; no tables or columns were cosmetically renamed.
-- Historical/stable identifiers such as existing audit event names and the founder role/permission vocabulary remain unchanged where renaming would alter contracts.
+## COMPATIBILITY
+Product identity remains LEO OS. Existing `@founder-os/*` package namespaces, historical migrations, database identifiers and stable role/audit identifiers remain unchanged where renaming would create compatibility risk.
