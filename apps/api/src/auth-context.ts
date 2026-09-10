@@ -10,8 +10,11 @@ function sessionToken(headers: IncomingHttpHeaders): string | undefined {
   const authorization = header(headers, 'authorization');
   if (authorization?.startsWith('Bearer ')) return authorization.slice(7).trim() || undefined;
   const cookie = header(headers, 'cookie');
-  const match = cookie?.match(/(?:^|;\s*)founder_os_session=([^;]+)/);
-  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+  const leoMatch = cookie?.match(/(?:^|;\s*)leo_os_session=([^;]+)/);
+  if (leoMatch?.[1]) return decodeURIComponent(leoMatch[1]);
+  // Compatibility: preserve existing sessions during the identity-only rename.
+  const legacyMatch = cookie?.match(/(?:^|;\s*)founder_os_session=([^;]+)/);
+  return legacyMatch?.[1] ? decodeURIComponent(legacyMatch[1]) : undefined;
 }
 export async function authenticateRequest(db: PrismaClient, headers: IncomingHttpHeaders): Promise<{ userId: string; email: string }> {
   const token = sessionToken(headers);
