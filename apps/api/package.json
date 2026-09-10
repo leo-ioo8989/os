@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {"dev": "tsx src/server.ts", "build": "tsc", "typecheck": "tsc --noEmit", "lint": "tsc --noEmit", "test": "tsx --test"},
-  "dependencies": {"@founder-os/core": "workspace:*", "@founder-os/db": "workspace:*"},
+  "dependencies": {"@founder-os/core": "workspace:*", "@founder-os/db": "workspace:*", "@prisma/client": "^6.15.0"},
   "devDependencies": {"tsx": "^4.20.3", "typescript": "^5.9.2"}
 }
