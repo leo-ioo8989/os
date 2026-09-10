@@ -1,4 +1,4 @@
-import type { ActorType, AuditResult, PrismaClient } from '@prisma/client';
+import type { ActorType, AuditResult, Prisma, PrismaClient } from '@prisma/client';
 
 export const AUDIT_EVENTS = {
   AUTHENTICATION_SUCCEEDED: 'authentication.succeeded', AUTHENTICATION_FAILED: 'authentication.failed', AUTHORIZATION_DENIED: 'authorization.denied',
@@ -9,15 +9,7 @@ export const AUDIT_EVENTS = {
   WORKFLOW_CREATED: 'workflow.created', WORKFLOW_UPDATED: 'workflow.updated',
 } as const;
 export type AuditEventType = (typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
-export interface AuditEventInput { organizationId:string; actorId?:string; actorType:ActorType; eventType:AuditEventType; resourceType?:string; resourceId?:string; action:string; result:AuditResult; metadata?:Record<string,unknown>; }
+export interface AuditEventInput { organizationId:string; actorId?:string; actorType:ActorType; eventType:AuditEventType; resourceType?:string; resourceId?:string; action:string; result:AuditResult; metadata?:Prisma.InputJsonValue; }
 const SENSITIVE_KEY = /(?:password|token|secret|api[_-]?key|credential|authorization|cookie|private[_-]?key|access[_-]?key)/i;
-export function sanitizeAuditMetadata(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizeAuditMetadata);
-  if (!value || typeof value !== 'object') return value;
-  const out: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(value)) out[key] = SENSITIVE_KEY.test(key) ? '[REDACTED]' : sanitizeAuditMetadata(item);
-  return out;
-}
-export async function recordAuditEvent(db: PrismaClient, input: AuditEventInput) {
-  return db.auditEvent.create({ data: { organization:{connect:{id:input.organizationId}}, actor:input.actorId?{connect:{id:input.actorId}}:undefined, actorType:input.actorType, eventType:input.eventType, resourceType:input.resourceType, resourceId:input.resourceId, action:input.action, result:input.result, metadata:sanitizeAuditMetadata(input.metadata ?? {}) as object } });
-}
+export function sanitizeAuditMetadata(value: unknown): unknown { if(Array.isArray(value))return value.map(sanitizeAuditMetadata); if(!value||typeof value!=='object')return value; const out:Record<string,unknown>={}; for(const [key,item] of Object.entries(value))out[key]=SENSITIVE_KEY.test(key)?'[REDACTED]':sanitizeAuditMetadata(item); return out; }
+export async function recordAuditEvent(db:PrismaClient,input:AuditEventInput){return db.auditEvent.create({data:{organization:{connect:{id:input.organizationId}},actor:input.actorId?{connect:{id:input.actorId}}:undefined,actorType:input.actorType,eventType:input.eventType,resourceType:input.resourceType,resourceId:input.resourceId,action:input.action,result:input.result,metadata:sanitizeAuditMetadata(input.metadata??{}) as Prisma.InputJsonValue}});}
