@@ -15,54 +15,54 @@ Phase 1 control-plane reliability, trusted execution infrastructure and durable 
 - V1.04 repository boundaries, transactional mutations, durable audit/approval/workflow foundations preserved.
 - V1.05 durable Job/Checkpoint execution boundary preserved.
 - V1.06 trusted Worker identity, credentials, capabilities, Execution Gateway and fingerprint-bound Approval preserved.
-- Explicit deterministic Workflow lifecycle: `PENDING → RUNNING → WAITING_APPROVAL / PAUSED / BLOCKED / FAILED / COMPLETED / CANCELLED`, with terminal-state protection.
-- Durable Workflow `currentTaskId` + `currentJobId` pointers.
-- Durable Job idempotency keys scoped by organization; repeated workflow job creation returns the existing durable job.
-- Atomic Job `SUCCEEDED` → task completion → deterministic next-task selection → queued next Job / terminal Workflow state.
-- Deterministic next-task policy: dependency readiness first, then stable task ID ordering because Task has no existing priority field.
-- Retryable Job failures remain `RETRY_QUEUED` and keep the Workflow resumable; exhausted/permanent failures move the Workflow/Task to failed state.
-- Durable approval blocking/resumption: `WAITING_APPROVAL` is persisted; approved work returns to `RETRY_QUEUED`; rejected work fails the Job/Workflow.
-- Workflow cancellation atomically cancels executable child Jobs and nonterminal Tasks; terminal Workflows do not resume or create new work.
-- Deterministic Workflow reconciliation reads persisted Workflow/Job/Approval state and repairs only proven-safe pointer/approval/terminal contradictions; ambiguous states are surfaced without guessing.
-- Existing Checkpoint repository remains the resumable execution state boundary with organization, worker ownership and redaction protections.
-- Existing AuditEvent system extended with workflow start/resume/task-selection/task-completion/blocked/failed/completed/reconciled events.
+- V1.07 durable Workflow↔Job coordination, deterministic task selection, workflow/job idempotency, approval blocking/resumption, cancellation and restart-safe reconciliation preserved.
+- Existing Checkpoint and AuditEvent boundaries preserved.
 - Additive V1.07 Prisma migration; no compatibility identifiers renamed or existing tables/columns dropped.
 
-## STATE OWNERSHIP
-Workflow owns workflow lifecycle/current state/current task/current job. Job owns execution attempt/lease/retry/approval-blocked/resumable execution state. Task owns task/dependency state. Approval owns human authorization state and never executes actions. Checkpoint owns versioned resumable execution snapshots for a Job.
+## ENVIRONMENT CREATED
+- Disposable PostgreSQL 16 Docker environment in `docker-compose.verification.yml`.
+- Isolated database `founder_os_test` exposed on local port `55432`.
+- Safe non-secret `verification.env.example` template.
+- Root commands for database start/stop/reset/status, Prisma generation/validation/migration, smoke test, unit/database/integration tests, typecheck and lint.
+- Real PostgreSQL runtime smoke test and initial V1.07 integration harness covering schema invariants, organization-scoped idempotency and workflow-generated non-null idempotency keys.
+- Minimal repository CI workflow at `.github/workflows/v107-verification.yml` using PostgreSQL 16.
+- Verification procedure documented in `docs/V1.07_VERIFICATION_ENVIRONMENT.md`.
 
-## IDEMPOTENCY / EXACTLY-ONCE BOUNDARY
-LEO OS does **not** claim mathematically perfect exactly-once external execution. V1.07 provides practical control-plane idempotency: organization-scoped Job idempotency keys, explicit Workflow current-job pointers, serializable coordination transactions and deterministic transition rejection. Repeated completion/advancement processing either observes the existing durable result or is rejected as ambiguous/invalid.
+## EXECUTED
+- Repository audit was executed through the available GitHub repository interface.
+- Local environment capability check was executed: Node.js is available, but Docker, pnpm and psql are unavailable; network access to clone the private repository is unavailable.
+- No repository runtime command was executed successfully in this session.
 
-## RECOVERY / RECONCILIATION
-Restart recovery uses durable state rather than in-memory state. Expired active Job leases continue through the V1.05 stale-lease recovery path. Approval-blocked Jobs remain blocked until a durable approval resolution exists. A consumed approval with a waiting Job can be reconciled to `RETRY_QUEUED`. A succeeded current Job can safely drive Workflow advancement. Terminal Workflows cancel remaining executable Jobs during reconciliation. Ambiguous states, such as multiple Jobs for one current Task or an unresolved current-job pointer, are preserved and surfaced rather than guessed.
+## PASSED
+- Source/repository audit confirms pnpm 10.15.0 declaration, Prisma 6.15.x dependency range, PostgreSQL datasource, migration chain through V1.07, and existing Node test-runner conventions.
+- Environment configuration was committed successfully.
+- No runtime test result is claimed as passed.
 
-## SECURITY REVIEW
-Reviewed for V1.07: cross-organization Workflow/Job IDs, forged parent IDs, duplicate transition/completion/advancement, duplicate Job creation, approval replay/mismatch, terminal Workflow/Job resurrection, unauthorized workflow advancement, suspended/revoked worker continuation, lease ownership bypass, checkpoint ownership and secret leakage. Organization predicates, worker lifecycle checks, deterministic state machines, serializable transactions, approval binding and existing recursive metadata redaction remain the security boundaries.
-
-## DATABASE
-V1.07 migration: `packages/db/prisma/migrations/20260910180000_v107_workflow_execution_coordination/migration.sql`. Additive changes: `Workflow.currentJobId`, `WorkflowStatus.BLOCKED`, organization-scoped `Job.idempotencyKey`, and corresponding indexes/unique constraint. **Migration application is NOT VERIFIED.**
-
-## TESTED
-- Added deterministic core tests for Workflow transitions, terminal protection, dependency-aware selection and stable task ordering.
-- Existing V1.05/V1.06 test sources remain preserved.
+## FAILED / BLOCKED
+- PostgreSQL runtime startup, Prisma generation, migration application, database smoke, integration tests, concurrency tests, recovery tests, security tests and CI execution were not runnable from the current execution environment.
 
 ## NOT VERIFIED
-- Tests were NOT executed in this session.
-- Prisma client generation is NOT VERIFIED after V1.07 schema changes.
-- PostgreSQL connectivity and V1.07 migration application are NOT VERIFIED.
-- Real serializable concurrency, duplicate completion races, approval replay races, lease races and restart behavior are NOT VERIFIED against a live database.
-- End-to-end worker → Job → Execution Gateway → Approval → Workflow continuation is NOT VERIFIED.
-- No successful CI run has been verified.
+- Prisma Client generation against the current V1.07 schema.
+- Prisma schema validation at runtime.
+- Complete migration application and actual database indexes/constraints.
+- Full existing test suite.
+- V1.07 end-to-end Worker→Job→Execution Gateway→Approval→Workflow continuation.
+- Real PostgreSQL concurrency behavior, approval replay races, worker lease races and checkpoint ownership races.
+- Restart/reconciliation behavior against a live database.
+- Cross-organization and forged-reference security behavior at runtime.
+- Failure-injection rollback behavior.
+- Successful GitHub Actions CI run.
 
-## BLOCKED / LIMITATIONS
-Live PostgreSQL/Prisma verification remains unavailable in this session. Autonomous worker polling and external action execution remain intentionally absent. V1.07 is control-plane coordination only.
+## BLOCKER
+**POSTGRESQL RUNTIME VERIFICATION BLOCKED**
+
+The repository now contains a reproducible verification environment, but this session cannot execute it because Docker/pnpm/psql are unavailable locally and the private GitHub repository cannot be cloned into the execution container due unavailable network access. No production or external database was used.
 
 ## NEXT DEPENDENCY
-V1.07 should be reviewed and then verified against a runnable PostgreSQL/Prisma environment, including concurrency and end-to-end control-plane tests, before V1.08. Phase 2 integrations, AI providers, MCP and Command Center remain out of scope.
+Run the committed verification environment on a machine or CI runner with Docker/Node/pnpm access, then execute the full V1.07 runtime, concurrency, recovery and security hardening suites. Do not start V1.08 until the evidence supports it.
 
-## STATUS VOCABULARY
-IMPLEMENTED · CONNECTED · CONFIGURED · PENDING CREDENTIALS · PLANNED · BLOCKED · NOT VERIFIED
+## STATUS
+**V1.07 — IMPLEMENTED, RUNTIME VERIFICATION BLOCKED**
 
 ## COMPATIBILITY
 Product identity remains LEO OS. Existing `@founder-os/*` package namespaces, historical migrations, database identifiers, storage identifiers and `founder_os_session` remain unchanged where renaming would create compatibility risk.
