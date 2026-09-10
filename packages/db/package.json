@@ -7,7 +7,7 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "smoke": "tsx test/runtime-smoke.ts",
-    "test:integration": "tsx --test test/v107-runtime.test.ts",
+    "test:integration": "tsx --test test/v107-runtime.test.ts test/v108-runtime.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test": "tsx --test"
