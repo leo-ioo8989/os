@@ -1,52 +1,60 @@
 # FOUNDER OS PROJECT STATE
 
-**Last updated:** 2026-09-10
-**Current version:** V1.03
+**Last updated:** 2026-09-10  
+**Current version:** V1.04
 
 ## CURRENT PHASE
-Phase 1 control-plane boundary: DB + RBAC foundation → authenticated organization-scoped APIs.
+Phase 1 control-plane reliability: repository boundary → transactional mutations → durable audit/approval/workflow state.
 
 ## IMPLEMENTED
-- Existing V0.1/V1.01 architecture preserved and evolved incrementally.
-- Objective/task/dependency domain contracts and deterministic graph validation remain in `packages/core`.
-- PostgreSQL/Prisma persistence foundation for organizations, users, memberships, sessions, objectives, tasks and dependencies.
-- Existing password and session-token security primitives preserved.
-- Reusable API authentication/context layer resolves persistent sessions and active organization membership.
-- Existing deterministic FOUNDER/ADMIN/OPERATOR/VIEWER permission matrix enforced server-side.
-- Persistent organization-scoped Objective APIs.
-- Persistent organization-scoped Task APIs.
-- Safe dependency mutation API reusing the core graph validator.
-- Input-size, JSON, identifier, enum and domain validation.
-- Consistent 401/403/404/409/422/500 API error model without sensitive error leakage.
-- Authentication, membership/RBAC and dependency test suites added.
+- V1.03 authentication, organization isolation and RBAC preserved.
+- `ControlPlaneRepository` introduced between API services and Prisma.
+- Objective/Task/Dependency mutations use serializable transactions where state and audit must commit atomically.
+- Dependency validation continues to use the existing deterministic `packages/core` graph logic inside the transaction boundary.
+- Durable `AuditEvent`, `Approval` and `Workflow` persistence models added.
+- Central typed audit vocabulary added.
+- Audit metadata redaction added for credential-like fields.
+- Approval lifecycle persistence and service-level RBAC/self-approval protection added.
+- Durable workflow state with resumable JSON state, retry count and failure fields added.
+- Additive V1.04 Prisma migration added; no destructive schema migration introduced.
+- V1.04 invariant tests added for approval/workflow transitions and audit redaction.
 
 ## TESTED
-- Static test coverage has been added for invalid/expired/valid sessions, membership isolation, RBAC matrix behavior, organization-scoped objective/task query construction, agent assignment validation, and dependency graph invariants.
+- Test source coverage exists for approval lifecycle invariants, workflow terminal-state invariants, audit vocabulary and recursive audit-secret redaction.
 
 ## NOT VERIFIED
-- Tests have NOT been executed in this session.
-- Live PostgreSQL connectivity, Prisma generation and migrations are NOT VERIFIED.
-- Real API integration tests against PostgreSQL are NOT VERIFIED.
-- No successful GitHub Actions CI run has been verified in this session.
+- No tests were executed in this session.
+- Prisma client generation is NOT VERIFIED.
+- PostgreSQL connectivity and migration application are NOT VERIFIED.
+- Repository CRUD/transaction behavior against a real PostgreSQL database is NOT VERIFIED.
+- No successful GitHub Actions CI run has been verified.
+
+## SECURITY REVIEW
+- Repository methods require organization-scoped predicates for control-plane resources.
+- Approval records are organization-scoped and decision authorization uses the existing permission matrix.
+- Requesters cannot approve their own approval request.
+- Approval lifecycle is database-persisted and only pending records can transition.
+- Audit metadata redacts password/token/secret/API-key/credential/cookie/private-key-like fields.
+- Audit records have organization and actor foreign keys and restrictive organization deletion.
+- Dependency uniqueness is database-enforced by the existing composite primary key; graph correctness remains in `packages/core`.
+- Serializable transactions are used for important mutations; live concurrency behavior remains NOT VERIFIED.
 
 ## BLOCKED
-- Nothing required for the V1.03 code boundary itself.
-- External integrations remain blocked/pending credentials and are intentionally untouched.
-
-## SECURITY BOUNDARY
-Authenticated user → membership → role → organization-scoped service query. Client-provided organization IDs are only accepted as selectors among actual memberships; ownership is never taken from request payloads. Objective and task reads/writes include organization scope, and task resources scope through their objective.
+- Nothing in the V1.04 code boundary is blocked.
+- Live database verification is NOT VERIFIED because a runnable PostgreSQL/Prisma environment is unavailable in this session.
+- External integrations remain intentionally untouched and are PENDING CREDENTIALS/PLANNED.
 
 ## REMAINING LIMITATIONS
-- API control-plane services currently access Prisma directly; a dedicated repository boundary is the next architectural hardening step.
-- Concurrent dependency mutation needs serializable transaction handling before high-concurrency orchestration.
-- Audit, approvals, budgets, durable workflow execution, retry/validation engine, and emergency controls are not implemented yet.
-- No autonomous execution should be enabled yet.
+- API status-transition matrices remain in `apps/api/src/control-plane.ts`; centralization in `packages/core` is future hardening.
+- Authentication/security audit events are defined but not yet wired to every auth failure/success path.
+- Approval/workflow persistence is a backend foundation; no UI or external action execution exists.
+- Durable external-job idempotency keys are deferred until the worker/execution boundary is introduced.
 
 ## NEXT PRIORITY
-Introduce a dedicated repository layer and transaction-safe control-plane mutations, then add durable audit/event records. Keep authorization above the repository and deterministic graph logic in `packages/core`.
-
-## STATUS VOCABULARY
-IMPLEMENTED · TESTED · NOT VERIFIED · CONNECTED · CONFIGURED · PENDING CREDENTIALS · PLANNED · BLOCKED
+Wire durable security/audit events through the authenticated API and then implement the persistent worker/job execution boundary needed for restart-safe workflow resumption. Keep external integrations, AI providers, autonomous execution and Command Center out of scope.
 
 ## NEXT AUTOMATIC STEP
-Harden the repository/service boundary and transactional dependency/objective/task state mutations before proceeding to audit and durable workflow execution.
+Add API-level audit/security-event coverage using the existing audit repository boundary, then validate the worker/job persistence design against the workflow state model.
+
+## STATUS VOCABULARY
+IMPLEMENTED · CONNECTED · CONFIGURED · PENDING CREDENTIALS · PLANNED · BLOCKED · NOT VERIFIED
