@@ -12,3 +12,6 @@ export {
 } from './execution.js';
 export type { ExecutionDecision, ExecutionIntent, ExecutionRisk } from './execution.js';
 export * from './workflow.js';
+export * from './intent.js';
+export * from './plan-proposal.js';
+export * from './plan-validation.js';
