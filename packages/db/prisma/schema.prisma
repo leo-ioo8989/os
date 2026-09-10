@@ -1,9 +1,5 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
+generator client { provider = "prisma-client-js" }
 datasource db { provider = "postgresql" url = env("DATABASE_URL") }
-
 enum ObjectiveStatus { DRAFT PLANNING READY RUNNING WAITING_APPROVAL BLOCKED PAUSED COMPLETED FAILED CANCELLED }
 enum Priority { LOW MEDIUM HIGH CRITICAL }
 enum RiskLevel { GREEN YELLOW RED }
@@ -13,9 +9,8 @@ enum ActorType { USER AGENT SYSTEM }
 enum AuditResult { SUCCESS FAILURE DENIED }
 enum ApprovalStatus { PENDING APPROVED REJECTED EXPIRED CANCELLED }
 enum WorkflowStatus { PENDING RUNNING WAITING_APPROVAL PAUSED COMPLETED FAILED CANCELLED }
-enum JobStatus { QUEUED CLAIMED RUNNING RETRY_QUEUED SUCCEEDED FAILED CANCELLED }
+enum JobStatus { QUEUED CLAIMED RUNNING WAITING_APPROVAL RETRY_QUEUED SUCCEEDED FAILED CANCELLED }
 enum WorkerStatus { ACTIVE SUSPENDED REVOKED }
-
 model Organization { id String @id @default(cuid()) name String createdAt DateTime @default(now()) updatedAt DateTime @updatedAt objectives Objective[] memberships Membership[] auditEvents AuditEvent[] approvals Approval[] workflows Workflow[] jobs Job[] checkpoints Checkpoint[] workers Worker[] }
 model User { id String @id @default(cuid()) email String @unique displayName String? passwordHash String? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt memberships Membership[] sessions Session[] auditEvents AuditEvent[] requestedApprovals Approval[] @relation("ApprovalRequester") decidedApprovals Approval[] @relation("ApprovalDecider") }
 model Membership { userId String organizationId String role Role @default(VIEWER) createdAt DateTime @default(now()) user User @relation(fields:[userId],references:[id],onDelete:Cascade) organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade) @@id([userId,organizationId]) @@index([organizationId,role]) }
