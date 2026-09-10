@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { canTransitionWorkflow, isTerminalWorkflowStatus, selectNextTask } from '../src/workflow.js';
+test('workflow lifecycle accepts deterministic transitions',()=>{assert.equal(canTransitionWorkflow('PENDING','RUNNING'),true);assert.equal(canTransitionWorkflow('RUNNING','WAITING_APPROVAL'),true);assert.equal(canTransitionWorkflow('RUNNING','BLOCKED'),true);assert.equal(canTransitionWorkflow('BLOCKED','RUNNING'),true);assert.equal(canTransitionWorkflow('COMPLETED','RUNNING'),false);assert.equal(canTransitionWorkflow('CANCELLED','RUNNING'),false);});
+test('terminal workflow states cannot resume',()=>{assert.equal(isTerminalWorkflowStatus('COMPLETED'),true);assert.equal(isTerminalWorkflowStatus('CANCELLED'),true);assert.equal(isTerminalWorkflowStatus('FAILED'),false);});
+test('next task selection is dependency-aware and stable by task id',()=>{const tasks=[{id:'z',status:'PENDING',dependencies:['a']},{id:'b',status:'PENDING',dependencies:[]},{id:'a',status:'COMPLETED',dependencies:[]}];assert.equal(selectNextTask(tasks)?.id,'b');const tied=[{id:'z',status:'READY',dependencies:[]},{id:'a',status:'READY',dependencies:[]}];assert.equal(selectNextTask(tied)?.id,'a');});
+test('blocked dependency prevents selection',()=>{const tasks=[{id:'b',status:'PENDING',dependencies:['a']},{id:'a',status:'BLOCKED',dependencies:[]}];assert.equal(selectNextTask(tasks),null);});
