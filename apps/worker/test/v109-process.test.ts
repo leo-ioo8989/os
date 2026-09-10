@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@founder-os/db';
 import { JobRepository, WorkerRepository } from '@founder-os/db';
 
 const db=new PrismaClient();
