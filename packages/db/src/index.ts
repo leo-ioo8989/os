@@ -10,3 +10,4 @@ export * from './workflow-repository.js';
 export * from './job-repository.js';
 export * from './worker-repository.js';
 export * from './workflow-job-repository.js';
+export * from './workflow-execution-repository.js';
