@@ -42,5 +42,9 @@ jobs:
         run: corepack enable && corepack prepare pnpm@10.15.0 --activate
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-      - name: V1.09 certification path
+      - name: RUN 1 — V1.07/V1.08 historical regression gate
+        run: pnpm verify:v107-v108-final
+      - name: Reset database before RUN 2
+        run: pnpm db:reset:migrate
+      - name: RUN 2 — complete Phase 1 V1.01-V1.09 certification gate
         run: pnpm verify:v109
