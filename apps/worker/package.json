@@ -1,0 +1,8 @@
+{
+  "name": "@founder-os/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {"dev":"tsx src/worker.ts","build":"tsc","typecheck":"tsc --noEmit","lint":"tsc --noEmit","test":"tsx --test"},
+  "dependencies": {"@founder-os/core":"workspace:*","@founder-os/db":"workspace:*"},
+  "devDependencies": {"tsx":"^4.20.3","typescript":"^5.9.2"}
+}
