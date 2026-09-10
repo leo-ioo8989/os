@@ -1,51 +1,52 @@
 # FOUNDER OS PROJECT STATE
 
 **Last updated:** 2026-09-10
-**Current version:** V1.01 evolution
-
-## CURRENT VERSION
-V1.01 — evolving the existing V0.1 foundation without rebuilding it.
+**Current version:** V1.03
 
 ## CURRENT PHASE
-Phase 2: durable control-plane persistence and RBAC foundation.
+Phase 1 control-plane boundary: DB + RBAC foundation → authenticated organization-scoped APIs.
 
-## COMPLETED
-- Repository audited against V1.01 requirements; current-state document maintained.
-- Existing deterministic permission primitive preserved.
-- Objective contract, task/dependency graph, and 21-agent registry added to `packages/core`.
-- Prisma/PostgreSQL package and initial objective/task/dependency migration added.
-- Organization, User, Membership, and Session persistence models added.
-- Secure password hashing/session-token hashing and session authentication primitives added using Node crypto.
-- Deterministic role/permission matrix added to `packages/core`.
-- Objective transition and persisted task-graph read boundaries added.
+## IMPLEMENTED
+- Existing V0.1/V1.01 architecture preserved and evolved incrementally.
+- Objective/task/dependency domain contracts and deterministic graph validation remain in `packages/core`.
+- PostgreSQL/Prisma persistence foundation for organizations, users, memberships, sessions, objectives, tasks and dependencies.
+- Existing password and session-token security primitives preserved.
+- Reusable API authentication/context layer resolves persistent sessions and active organization membership.
+- Existing deterministic FOUNDER/ADMIN/OPERATOR/VIEWER permission matrix enforced server-side.
+- Persistent organization-scoped Objective APIs.
+- Persistent organization-scoped Task APIs.
+- Safe dependency mutation API reusing the core graph validator.
+- Input-size, JSON, identifier, enum and domain validation.
+- Consistent 401/403/404/409/422/500 API error model without sensitive error leakage.
+- Authentication, membership/RBAC and dependency test suites added.
 
-## IN PROGRESS
-- API authentication middleware and organization-scoped authorization.
-- Persistent application services/routes for objectives and tasks.
-- Automated tests and CI.
-- Durable orchestrator/worker runtime.
-- Tool/model registries and permission-enforced execution gateway.
+## TESTED
+- Static test coverage has been added for invalid/expired/valid sessions, membership isolation, RBAC matrix behavior, organization-scoped objective/task query construction, agent assignment validation, and dependency graph invariants.
+
+## NOT VERIFIED
+- Tests have NOT been executed in this session.
+- Live PostgreSQL connectivity, Prisma generation and migrations are NOT VERIFIED.
+- Real API integration tests against PostgreSQL are NOT VERIFIED.
+- No successful GitHub Actions CI run has been verified in this session.
 
 ## BLOCKED
-- Real external integrations remain blocked until credentials/accounts are configured. No fake connected states are permitted.
+- Nothing required for the V1.03 code boundary itself.
+- External integrations remain blocked/pending credentials and are intentionally untouched.
 
-## PENDING APPROVAL
-- None.
+## SECURITY BOUNDARY
+Authenticated user → membership → role → organization-scoped service query. Client-provided organization IDs are only accepted as selectors among actual memberships; ownership is never taken from request payloads. Objective and task reads/writes include organization scope, and task resources scope through their objective.
 
-## KNOWN ISSUES
-- Live PostgreSQL migration/generation and runtime tests have not been executed in this session because the GitHub connector does not provide a repository-local shell/CI runner.
-- API remains a minimal raw Node HTTP boundary until auth and application routes are introduced.
-- No web Command Center or worker application is verified in the tree.
-- Prisma generated client/lockfile still require dependency installation in the actual development/CI environment.
-
-## TECHNICAL DEBT
-- Add a reproducible pnpm lockfile/CI install and run typecheck/tests against generated Prisma client.
-- Add database-backed integration tests with disposable PostgreSQL.
-- Add strict legal state-transition matrix rather than permitting arbitrary objective transitions.
-- Add credential/session revocation and security headers at the API boundary.
+## REMAINING LIMITATIONS
+- API control-plane services currently access Prisma directly; a dedicated repository boundary is the next architectural hardening step.
+- Concurrent dependency mutation needs serializable transaction handling before high-concurrency orchestration.
+- Audit, approvals, budgets, durable workflow execution, retry/validation engine, and emergency controls are not implemented yet.
+- No autonomous execution should be enabled yet.
 
 ## NEXT PRIORITY
-Finish API authentication + organization-scoped RBAC, then expose the first persistent objective/task APIs. After that, build the durable workflow state machine and orchestrator on top of persistence.
+Introduce a dedicated repository layer and transaction-safe control-plane mutations, then add durable audit/event records. Keep authorization above the repository and deterministic graph logic in `packages/core`.
+
+## STATUS VOCABULARY
+IMPLEMENTED · TESTED · NOT VERIFIED · CONNECTED · CONFIGURED · PENDING CREDENTIALS · PLANNED · BLOCKED
 
 ## NEXT AUTOMATIC STEP
-Implement API session authentication middleware and RBAC guards using the existing core permission matrix and database session/membership models. Keep all mutable founder-control endpoints organization-scoped.
+Harden the repository/service boundary and transactional dependency/objective/task state mutations before proceeding to audit and durable workflow execution.
