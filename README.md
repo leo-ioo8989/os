@@ -56,6 +56,27 @@ docs/          architecture, security, API and operations docs
 
 No production credentials are committed to this repository.
 
+## V1.07 verification environment
+
+A disposable PostgreSQL 16 environment is now defined in `docker-compose.verification.yml`. It uses the isolated database `founder_os_test` on local port `55432`; it does not use production credentials or a paid cloud database.
+
+```bash
+pnpm install
+pnpm db:start
+pnpm db:generate
+pnpm db:validate
+pnpm db:migrate
+pnpm db:smoke
+pnpm typecheck
+pnpm lint
+pnpm test:unit
+pnpm test:integration
+```
+
+Use `pnpm db:reset` only for the disposable verification database. See `docs/V1.07_VERIFICATION_ENVIRONMENT.md` and `verification.env.example` for the reproducible setup and exact test contract.
+
+**Environment created is not the same as V1.07 verified.** The live PostgreSQL tests, concurrency/recovery/security certification and CI still require actual execution. The current status remains **V1.07 — IMPLEMENTED, RUNTIME VERIFICATION BLOCKED** until that evidence exists.
+
 ## Current scope
 
 The repository is being evolved incrementally through **Phase 1**. **V1.07** establishes durable Workflow↔Job coordination, deterministic next-task selection, workflow/job idempotency, atomic success/retry/approval coordination, cancellation, checkpoint-compatible resumable state and restart-safe reconciliation. External integrations, AI agents, model providers and the Command Center UI remain intentionally out of scope.
