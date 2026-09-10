@@ -9,6 +9,7 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "test:unit": "pnpm --filter @founder-os/core test && pnpm --filter @founder-os/db test && pnpm --filter @founder-os/api test && pnpm --filter @founder-os/worker test",
+    "test:worker": "pnpm --filter @founder-os/worker test",
     "test:db": "pnpm --filter @founder-os/db test",
     "test:integration": "pnpm --filter @founder-os/db test:integration",
     "db:start": "docker compose -f docker-compose.verification.yml up -d postgres",
@@ -20,6 +21,7 @@
     "db:migrate": "pnpm --filter @founder-os/db migrate:deploy",
     "db:smoke": "pnpm --filter @founder-os/db smoke",
     "verify:v107": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration",
+    "verify:v108": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration",
     "format": "prettier --write ."
   },
   "devDependencies": {
