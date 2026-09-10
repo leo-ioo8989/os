@@ -1,4 +1,4 @@
-name: LEO OS V1.07 Verification
+name: LEO OS V1.08 Verification
 
 on:
   push:
@@ -30,38 +30,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.15.0 --activate
-
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-
-      - name: Generate Prisma Client
-        run: pnpm db:generate
-
-      - name: Validate Prisma schema
-        run: pnpm db:validate
-
-      - name: Apply migrations
-        run: pnpm db:migrate
-
-      - name: PostgreSQL smoke test
-        run: pnpm db:smoke
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Unit tests
-        run: pnpm test:unit
-
-      - name: Database integration tests
-        run: pnpm test:integration
+      - name: V1.08 verification path
+        run: pnpm verify:v108
