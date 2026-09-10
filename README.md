@@ -2,33 +2,47 @@
 
 **LEO = Leadership & Execution Operating System**
 
-LEO OS is an internal AI-native operating system for running the founder's company workflows. It turns objectives into durable, permission-aware workflows executed by specialized AI agents and verified by the system.
+LEO OS is a private internal operating system for running the founder's company workflows. The current Phase 1 implementation is control-plane infrastructure: durable objectives, tasks, workflows, jobs, trusted workers, approvals, checkpoints and audit state.
 
 ## Internal / private status
 
 LEO OS is currently a private internal operating system intended only for the founder's company and work. It is **not currently a public SaaS product**. No public deployment or publishing infrastructure is part of the current scope.
 
-## V0.1 architecture
+## Current Phase 1 architecture
 
-- Web: Next.js + React + TypeScript
-- API: Fastify + TypeScript
-- Worker: TypeScript workers backed by PostgreSQL jobs (pg-boss)
-- Database: PostgreSQL + Prisma
-- AI: provider abstraction with one initial provider adapter
-- Integrations: adapter/connector architecture
-- Auth: session-based authentication with RBAC
-- Storage: S3-compatible object storage abstraction
-- Observability: structured application events, audit log, metrics/tracing hooks
+```text
+Objective
+  ↓
+Workflow
+  ↓
+Task / Dependency Graph
+  ↓
+Durable Job
+  ↓
+Trusted Worker
+  ↓
+Execution Gateway
+  ↓
+Approval Gateway when required
+  ↓
+Job result / checkpoint
+  ↓
+Atomic workflow advancement
+  ↓
+Next durable task/job or terminal workflow state
+  ↓
+Audit / company memory
+```
+
+Workflow and Job state are persisted independently but coordinated through serializable repository transactions. Workflow progression uses an explicit current-task/current-job pointer, deterministic task selection and job idempotency keys. Reconciliation reads durable state after restart and only repairs states that can be proven safe; ambiguous states are surfaced rather than guessed.
 
 ## Repository
 
 ```text
-apps/web       LEO OS dashboard and command center (planned)
 apps/api       HTTP API and application services
-apps/worker    durable orchestration/execution workers
-packages/db    Prisma schema and database client
-packages/core  domain contracts and permission primitives
-packages/config shared environment/config validation
+apps/worker    durable worker/job boundary
+packages/db    Prisma schema, repositories and transactions
+packages/core  deterministic domain state machines and permission primitives
 docs/          architecture, security, API and operations docs
 ```
 
@@ -44,6 +58,6 @@ No production credentials are committed to this repository.
 
 ## Current scope
 
-The repository is being evolved incrementally through Phase 1. The current V1.05 work establishes the durable worker/job execution boundary and restart-safe persistence state. External integrations, model-provider connections and the Command Center UI remain intentionally out of scope until their later roadmap phase.
+The repository is being evolved incrementally through **Phase 1**. **V1.07** establishes durable Workflow↔Job coordination, deterministic next-task selection, workflow/job idempotency, atomic success/retry/approval coordination, cancellation, checkpoint-compatible resumable state and restart-safe reconciliation. External integrations, AI agents, model providers and the Command Center UI remain intentionally out of scope.
 
 Some internal package names and legacy identifiers still use the historical `founder-os` / `founder_os` namespace for compatibility; these are technical compatibility identifiers, not the product identity.
