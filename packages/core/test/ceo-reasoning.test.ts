@@ -6,6 +6,7 @@ import {
   type CEOReasoningModelOutput,
   type CEOReasoningRequest,
   type ModelProvider,
+  type ModelRequest,
   type ModelResponse,
   createOwnerIntent,
 } from '../src/index.js';
@@ -59,8 +60,8 @@ function deterministicReasoningProvider(modelOutput: CEOReasoningModelOutput): M
   return {
     providerId: deterministic.providerId,
     modelId: deterministic.modelId,
-    generate<TInput = unknown, TOutput = unknown>(request: Parameters<ModelProvider['generate']>[0]): ModelResponse<TOutput> {
-      const envelope = deterministic.generate(request);
+    generate<TInput = unknown, TOutput = unknown>(request: ModelRequest<TInput>): ModelResponse<TOutput> {
+      const envelope = deterministic.generate<TInput, unknown>(request);
       return { ...envelope, output: modelOutput as TOutput };
     },
   };
@@ -166,7 +167,7 @@ test('proposal validation remains authoritative for invalid task graphs', () => 
   const invalid = output({
     plan: { ...plan(), tasks: [{ ...plan().tasks[0], dependencies: ['missing-task'] }] },
   });
-  assert.throws(() => new CEOReasoningEngine().reason(request(), deterministicReasoningProvider(invalid)), /missing dependency/i);
+  assert.throws(() => new CEOReasoningEngine().reason(request(), deterministicReasoningProvider(invalid)), /depends on missing task/i);
 });
 
 test('reasoning failure cannot become a decision proposal', () => {
