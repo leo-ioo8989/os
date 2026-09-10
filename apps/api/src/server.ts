@@ -18,20 +18,20 @@ async function route(req: import('node:http').IncomingMessage, res: import('node
     if (p.length === 2 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'objective:write'); return writeJson(res, 201, { data: await createObjective(db, c.organizationId, c.userId, body) }); }
     const oid = pathId(p[2], 'objectiveId');
     if (p.length === 3 && method === 'GET') { const c = await requireOrganization(db, req.headers, 'objective:read'); return writeJson(res, 200, { data: await getObjective(db, c.organizationId, oid) }); }
-    if (p.length === 3 && method === 'PATCH') { const c = await requireOrganization(db, req.headers, 'objective:write'); return writeJson(res, 200, { data: await updateObjective(db, c.organizationId, oid, body) }); }
-    if (p.length === 3 && method === 'DELETE') { const c = await requireOrganization(db, req.headers, 'objective:write'); await deleteObjective(db, c.organizationId, oid); return writeJson(res, 204, null); }
-    if (p[3] === 'status' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'objective:write'); await changeObjectiveStatus(db, c.organizationId, oid, bodyStatus(body, objectiveStatuses) as never); return writeJson(res, 200, { data: await getObjective(db, c.organizationId, oid) }); }
+    if (p.length === 3 && method === 'PATCH') { const c = await requireOrganization(db, req.headers, 'objective:write'); return writeJson(res, 200, { data: await updateObjective(db, c.organizationId, oid, body, c.userId) }); }
+    if (p.length === 3 && method === 'DELETE') { const c = await requireOrganization(db, req.headers, 'objective:write'); await deleteObjective(db, c.organizationId, oid, c.userId); return writeJson(res, 204, null); }
+    if (p[3] === 'status' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'objective:write'); await changeObjectiveStatus(db, c.organizationId, oid, bodyStatus(body, objectiveStatuses) as never, c.userId); return writeJson(res, 200, { data: await getObjective(db, c.organizationId, oid) }); }
     if (p[3] === 'tasks' && p.length === 4 && method === 'GET') { const c = await requireOrganization(db, req.headers, 'task:read'); return writeJson(res, 200, { data: await listTasks(db, c.organizationId, oid) }); }
-    if (p[3] === 'tasks' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'task:write'); return writeJson(res, 201, { data: await createTask(db, c.organizationId, oid, body) }); }
+    if (p[3] === 'tasks' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'task:write'); return writeJson(res, 201, { data: await createTask(db, c.organizationId, oid, body, c.userId) }); }
   }
   if (p[1] === 'tasks') {
     const tid = pathId(p[2], 'taskId');
     if (p.length === 3 && method === 'GET') { const c = await requireOrganization(db, req.headers, 'task:read'); return writeJson(res, 200, { data: await getTask(db, c.organizationId, tid) }); }
-    if (p.length === 3 && method === 'PATCH') { const c = await requireOrganization(db, req.headers, 'task:write'); return writeJson(res, 200, { data: await updateTask(db, c.organizationId, tid, body) }); }
-    if (p.length === 3 && method === 'DELETE') { const c = await requireOrganization(db, req.headers, 'task:write'); await deleteTask(db, c.organizationId, tid); return writeJson(res, 204, null); }
-    if (p[3] === 'status' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'task:write'); await changeTaskStatus(db, c.organizationId, tid, bodyStatus(body, taskStatuses) as never); return writeJson(res, 200, { data: await getTask(db, c.organizationId, tid) }); }
-    if (p[3] === 'dependencies' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'task:write'); const dep = pathId(typeof body.dependencyId === 'string' ? body.dependencyId : undefined, 'dependencyId'); await addDependency(db, c.organizationId, tid, dep); return writeJson(res, 201, { data: await getTask(db, c.organizationId, tid) }); }
-    if (p[3] === 'dependencies' && p.length === 5 && method === 'DELETE') { const c = await requireOrganization(db, req.headers, 'task:write'); await removeDependency(db, c.organizationId, tid, pathId(p[4], 'dependencyId')); return writeJson(res, 204, null); }
+    if (p.length === 3 && method === 'PATCH') { const c = await requireOrganization(db, req.headers, 'task:write'); return writeJson(res, 200, { data: await updateTask(db, c.organizationId, tid, body, c.userId) }); }
+    if (p.length === 3 && method === 'DELETE') { const c = await requireOrganization(db, req.headers, 'task:write'); await deleteTask(db, c.organizationId, tid, c.userId); return writeJson(res, 204, null); }
+    if (p[3] === 'status' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'task:write'); await changeTaskStatus(db, c.organizationId, tid, bodyStatus(body, taskStatuses) as never, c.userId); return writeJson(res, 200, { data: await getTask(db, c.organizationId, tid) }); }
+    if (p[3] === 'dependencies' && p.length === 4 && method === 'POST') { const c = await requireOrganization(db, req.headers, 'task:write'); const dep = pathId(typeof body.dependencyId === 'string' ? body.dependencyId : undefined, 'dependencyId'); await addDependency(db, c.organizationId, tid, dep, c.userId); return writeJson(res, 201, { data: await getTask(db, c.organizationId, tid) }); }
+    if (p[3] === 'dependencies' && p.length === 5 && method === 'DELETE') { const c = await requireOrganization(db, req.headers, 'task:write'); await removeDependency(db, c.organizationId, tid, pathId(p[4], 'dependencyId'), c.userId); return writeJson(res, 204, null); }
   }
   throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
 }
