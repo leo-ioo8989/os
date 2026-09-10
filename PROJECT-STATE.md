@@ -7,27 +7,24 @@
 V1.01 — evolving the existing V0.1 foundation without rebuilding it.
 
 ## CURRENT PHASE
-Phase 2 foundation: durable control-plane persistence introduced; application services and authentication/RBAC are next.
+Phase 2: durable control-plane persistence and RBAC foundation.
 
 ## COMPLETED
-- Existing repository audited against V1.01 requirements.
-- `FOUNDER_OS_CURRENT_STATE.md` refreshed from the verified tree.
+- Repository audited against V1.01 requirements; current-state document maintained.
 - Existing deterministic permission primitive preserved.
-- V1.01 objective domain contract added with lifecycle statuses and cost/deadline fields.
-- Deterministic task/dependency graph added with dependency validation, cycle detection, ready/blocked calculation, graph analysis, and execution-wave discovery.
-- Common Agent Registry added with all 21 requested initial agent identities.
-- Core domain exports consolidated.
-- `packages/db` added with Prisma/PostgreSQL configuration.
-- Durable models added for organizations, objectives, tasks, and task dependencies.
-- Initial SQL migration added for the control-plane objective/task graph state.
-- Shared Prisma client/export boundary added.
+- Objective contract, task/dependency graph, and 21-agent registry added to `packages/core`.
+- Prisma/PostgreSQL package and initial objective/task/dependency migration added.
+- Organization, User, Membership, and Session persistence models added.
+- Secure password hashing/session-token hashing and session authentication primitives added using Node crypto.
+- Deterministic role/permission matrix added to `packages/core`.
+- Objective transition and persisted task-graph read boundaries added.
 
 ## IN PROGRESS
-- Database repositories and transactional objective/task services.
-- Authentication and RBAC.
-- API services/routes around persistent control-plane state.
+- API authentication middleware and organization-scoped authorization.
+- Persistent application services/routes for objectives and tasks.
 - Automated tests and CI.
-- Orchestrator and durable worker runtime.
+- Durable orchestrator/worker runtime.
+- Tool/model registries and permission-enforced execution gateway.
 
 ## BLOCKED
 - Real external integrations remain blocked until credentials/accounts are configured. No fake connected states are permitted.
@@ -36,19 +33,19 @@ Phase 2 foundation: durable control-plane persistence introduced; application se
 - None.
 
 ## KNOWN ISSUES
-- Database connectivity and migrations have not been executed in a live environment from this session.
-- Objective/task contracts are persisted only at schema level; repository/application service code is next.
-- API remains a minimal raw Node HTTP boundary until application services/routes are ready.
-- Web Command Center and worker applications are not yet verified in the tree.
+- Live PostgreSQL migration/generation and runtime tests have not been executed in this session because the GitHub connector does not provide a repository-local shell/CI runner.
+- API remains a minimal raw Node HTTP boundary until auth and application routes are introduced.
+- No web Command Center or worker application is verified in the tree.
+- Prisma generated client/lockfile still require dependency installation in the actual development/CI environment.
 
 ## TECHNICAL DEBT
-- Root workspace dependency lockfile and CI validation still need to be established.
-- Database tests need a reproducible PostgreSQL test environment.
-- Permission primitive needs to connect to real authentication and execution authorization.
-- Autonomous execution must remain disabled until durable state, approvals, validation, retry limits, budgets, and audit are enforced.
+- Add a reproducible pnpm lockfile/CI install and run typecheck/tests against generated Prisma client.
+- Add database-backed integration tests with disposable PostgreSQL.
+- Add strict legal state-transition matrix rather than permitting arbitrary objective transitions.
+- Add credential/session revocation and security headers at the API boundary.
 
 ## NEXT PRIORITY
-Build the persistence repository/service layer over Prisma for objectives and task/dependency graphs, with transaction-safe state transitions and deterministic graph validation. Then add authentication/RBAC before mutable founder-control APIs.
+Finish API authentication + organization-scoped RBAC, then expose the first persistent objective/task APIs. After that, build the durable workflow state machine and orchestrator on top of persistence.
 
 ## NEXT AUTOMATIC STEP
-Implement `packages/db` repositories/services for objective and task graph persistence, keeping `packages/core` as the pure deterministic domain layer.
+Implement API session authentication middleware and RBAC guards using the existing core permission matrix and database session/membership models. Keep all mutable founder-control endpoints organization-scoped.
