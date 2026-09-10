@@ -7,3 +7,4 @@ export * from './audit.js';
 export * from './approval-repository.js';
 export * from './control-plane-repository.js';
 export * from './workflow-repository.js';
+export * from './job-repository.js';
