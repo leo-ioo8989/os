@@ -1,0 +1,7 @@
+export const EXTERNAL_ACTION_AUTHORITY = 'PROPOSAL_ONLY' as const;
+export const EXTERNAL_ACTIONS = ['SEND_MESSAGE','PUBLISH_CONTENT','CREATE_RESOURCE','UPDATE_RESOURCE','DELETE_RESOURCE','BUY','DEPLOY'] as const;
+export type ExternalAction = (typeof EXTERNAL_ACTIONS)[number];
+export type ExternalActionRisk = 'LOW'|'MEDIUM'|'HIGH'|'CRITICAL';
+export interface ExternalActionProposal { proposalId:string; organizationId:string; ownerUserId:string; action:ExternalAction; target:string; purpose:string; risk:ExternalActionRisk; approvalRequired:boolean; authority:'PROPOSAL_ONLY'; provenance:string; }
+const forbidden=['credentialId','accessToken','apiKey','approvalGranted','workerId','execute','dispatch','permissionGrant','capabilityGrant','spend'];
+export function validateExternalActionProposal(p:ExternalActionProposal):void{if(!p.proposalId||!p.organizationId||!p.ownerUserId||!p.target||!p.purpose||!p.provenance)throw new Error('External action proposal is missing required identity');if(!EXTERNAL_ACTIONS.includes(p.action))throw new Error('Unsupported external action');if(!['LOW','MEDIUM','HIGH','CRITICAL'].includes(p.risk))throw new Error('Invalid external action risk');if(p.authority!==EXTERNAL_ACTION_AUTHORITY)throw new Error('External action must remain proposal-only');if((p.risk==='HIGH'||p.risk==='CRITICAL')&&!p.approvalRequired)throw new Error('High-risk external action requires approval');const text=JSON.stringify(p);for(const key of forbidden)if(text.includes(`"${key}"`))throw new Error(`Forbidden authority field: ${key}`)}
