@@ -7,7 +7,7 @@ export interface CreateJobInput { organizationId:string; objectiveId?:string; ta
 export interface JobFailure { code:string; message:string; retryable:boolean }
 export interface DurableExecutionResultInput { status:'SUCCEEDED'|'FAILED'; output?:Record<string,unknown>; error?:{code:string;message:string;retryable:boolean}; handlerId:string; validatedAt?:Date }
 
-const auditData=(i:AuditEventInput,e:AuditEventInput['eventType'],id:string):Prisma.AuditEventCreateInput=>({organization:{connect:{id:i.organizationId}},actorId:i.actorId?i.actorId:undefined,actorType:i.actorType,eventType:e,resourceType:'Job',resourceId:id,action:i.action,result:i.result,metadata:sanitizeAuditMetadata(i.metadata??{}) as Prisma.InputJsonValue});
+const auditData=(i:AuditEventInput,e:AuditEventInput['eventType'],id:string):Prisma.AuditEventCreateInput=>({organization:{connect:{id:i.organizationId}},actor:i.actorId?{connect:{id:i.actorId}}:undefined,actorType:i.actorType,eventType:e,resourceType:'Job',resourceId:id,action:i.action,result:i.result,metadata:sanitizeAuditMetadata(i.metadata??{}) as Prisma.InputJsonValue});
 const isSerializationConflict=(error:unknown)=>typeof error==='object'&&error!==null&&'code' in error&&(error as {code?:unknown}).code==='P2034';
 const isUniqueResultConflict=(error:unknown)=>typeof error==='object'&&error!==null&&'code' in error&&(error as {code?:unknown}).code==='P2002';
 
