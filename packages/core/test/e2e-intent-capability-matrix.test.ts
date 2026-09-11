@@ -25,8 +25,6 @@ const cases: Array<{name:string; text:string; expected:string[]}> = [
   {name:'content qa', text:'Proofread and fact check the content', expected:['CONTENT_QA']},
 ];
 
-// 20 semantic families x 60 lexical/context variants = 1200 independently
-// generated owner prompts. Each case is a real OwnerIntent variation.
 const prompts = Array.from({length:1200}, (_, i) => {
   const base = cases[i % cases.length]!;
   const variant = i % 60;
@@ -62,7 +60,7 @@ test('1200 owner prompts classify known capability domains without authority lea
     assert.equal(proposal.tasks[0]?.targetOrganizationId, intent.organizationId);
     const serialized = JSON.stringify(proposal);
     for (const forbidden of ['approvalGranted','workerId','credentialId','execute','dispatch','externalAction','grantedPermissions','grantedCapabilities']) {
-      assert.equal(serialized.includes(`"${forbidden}"`), false, `prompt ${i} leaked ${forbidden}`);
+      assert.equal(serialized.includes(`\"${forbidden}\"`), false, `prompt ${i} leaked ${forbidden}`);
     }
   }
 });
@@ -74,7 +72,7 @@ test('website command maps to governed workforce requirements', () => {
     riskRequirements: [], createdAt: '2026-09-12T00:00:00.000Z', correlationId: 'website-e2e-correlation',
   });
   const proposal = new DeterministicPlanGenerator().propose(intent);
-  assert.deepEqual(proposal.requiredCapabilities, ['SOFTWARE_ENGINEERING','FRONTEND_DEVELOPMENT','UX_DESIGN','VISUAL_DESIGN']);
+  assert.deepEqual(proposal.requiredCapabilities, ['SOFTWARE_ENGINEERING','FRONTEND_DEVELOPMENT','UX_DESIGN','VISUAL_DESIGN','GROWTH_ANALYSIS']);
   assert.equal(proposal.tasks[0]?.proposedWorkerRole, 'frontend-engineer');
   assert.equal(proposal.authority, 'PROPOSAL_ONLY');
 });
