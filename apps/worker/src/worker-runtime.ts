@@ -145,10 +145,10 @@ export class WorkerRuntime {
       }
       if (result.status === 'FAILED') {
         const e = result.error!;
-        await this.jobs.fail(organizationId, jobId, workerId, e.code, e.message, e.retryable);
+        await this.jobs.failWithResult(organizationId, jobId, workerId, result, h.id);
         return { kind: 'failed', jobId, reason: e.code };
       }
-      const done = await this.jobs.succeed(organizationId, jobId, workerId);
+      const done = await this.jobs.succeedWithResult(organizationId, jobId, workerId, result, h.id);
       if (done.kind !== 'updated') return { kind: 'failed', jobId, reason: done.kind };
       await this.jobs.audit(organizationId, AUDIT_EVENTS.JOB_SUCCEEDED, 'Job', jobId, 'handler_completed', 'SUCCESS', { handlerId: h.id });
       return { kind: 'succeeded', jobId };
