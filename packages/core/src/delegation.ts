@@ -1,4 +1,4 @@
-import { decideExecution, type ExecutionRisk } from './execution.js';
+import type { ExecutionRisk } from './execution.js';
 import type {
   WorkforceCapability,
   WorkforceContextScope,
@@ -10,10 +10,8 @@ import type {
 } from './workforce.js';
 import { assertWorkforceProposalHasNoAuthority, validateCapabilityMatch } from './workforce.js';
 
-export const DELEGATION_STATUSES = ['PROPOSED','AUTHORIZED','QUEUED','CANCELLED','EXPIRED'] as const;
+export const DELEGATION_STATUSES = ['PROPOSED','QUEUED','CANCELLED','EXPIRED'] as const;
 export type DelegationStatus = typeof DELEGATION_STATUSES[number];
-export const WORKER_STATUSES = ['CREATED','AUTHORIZED'] as const;
-export type AuthorizedWorkerStatus = typeof WORKER_STATUSES[number];
 export const QA_DECISIONS = ['PASS','REWORK','ESCALATE'] as const;
 export type QADecision = typeof QA_DECISIONS[number];
 
@@ -36,21 +34,12 @@ export interface DelegationProposal {
   provenance: string;
 }
 
-export interface DelegationAuthorization {
-  organizationId: string;
-  delegationId: string;
-  workerId: string;
-  approvalGranted: boolean;
-  authorizedCapabilities: readonly WorkforceCapability[];
-  authorizedContext: WorkforceContextScope;
-  providerId: string;
-  modelId: string;
-  risk: ExecutionRisk;
-  authorizedAt: string;
-  provenance: string;
-}
-
-export interface AuthorizedWorker {
+/**
+ * Data supplied by the authoritative control-plane worker identity boundary.
+ * Slice #8 may validate this binding, but it does not create, activate, or
+ * authorize the worker. ExecutionGateway/WorkerRepository remain authoritative.
+ */
+export interface ControlPlaneWorkerBinding {
   workerId: string;
   organizationId: string;
   taskId: string;
@@ -61,8 +50,6 @@ export interface AuthorizedWorker {
   providerId: string;
   modelId: string;
   risk: ExecutionRisk;
-  status: AuthorizedWorkerStatus;
-  createdAt: string;
 }
 
 export interface AuthorizedDelegationJobInput {
@@ -103,16 +90,6 @@ export interface QAResult {
   decision: QADecision;
   reason: string;
   qualityCriteria: readonly string[];
-}
-
-export interface DelegationExecutionPolicy {
-  maxAttempts: number;
-  allowReassignment: boolean;
-  allowEscalation: boolean;
-}
-
-export interface DeterministicWorkerBehavior<TOutput = unknown> {
-  execute(input: { worker: AuthorizedWorker; context: WorkforceContextScope }): WorkerResult<TOutput>;
 }
 
 function timestampValid(value: string): boolean { return Number.isFinite(Date.parse(value)); }
@@ -171,53 +148,19 @@ export function assertDelegationProposalHasNoAuthority(proposal: DelegationPropo
   }
 }
 
-export function authorizeDelegation(
-  proposal: DelegationProposal,
-  role: WorkforceRole,
-  providerModel: EligibleProviderModel,
-  workerId: string,
-  approvalGranted: boolean,
-  now = new Date().toISOString(),
-): DelegationAuthorization {
+/**
+ * Builds the durable Job payload from an already-authoritative control-plane
+ * worker binding. This function deliberately performs no authorization,
+ * approval, worker activation, credential lookup, or execution.
+ */
+export function buildDelegationJobInput(proposal: DelegationProposal, worker: ControlPlaneWorkerBinding): AuthorizedDelegationJobInput {
   assertDelegationProposalHasNoAuthority(proposal);
-  if (!workerId.trim()) throw new Error('An existing control-plane worker identity is required');
-  if (!timestampValid(now)) throw new Error('Authorization timestamp must be valid');
-  if (proposal.organizationId !== role.organizationId) throw new Error('Delegation role organization mismatch');
-  if (proposal.roleId !== role.roleId) throw new Error('Delegation role binding mismatch');
-  if (proposal.selectedProviderModel.providerId !== providerModel.providerId || proposal.selectedProviderModel.modelId !== providerModel.modelId) throw new Error('Provider/model is not the selected eligible delegation target');
-  validateCapabilityMatch(proposal.requiredCapabilities, role.capabilityRequirements);
-  if (!sameScope(proposal.requestedContext, role.contextScope)) throw new Error('Delegation context exceeds role scope');
-  if (proposal.approvalRequired && !approvalGranted) throw new Error('Approval is required before delegation authorization');
-  const decision = decideExecution(proposal.risk, true, approvalGranted);
-  if (decision !== 'ALLOW') throw new Error(`Execution authorization denied: ${decision}`);
-  return {
-    organizationId: proposal.organizationId,
-    delegationId: proposal.proposalId,
-    workerId,
-    approvalGranted,
-    authorizedCapabilities: [...proposal.requiredCapabilities],
-    authorizedContext: { ...proposal.requestedContext },
-    providerId: providerModel.providerId,
-    modelId: providerModel.modelId,
-    risk: proposal.risk,
-    authorizedAt: now,
-    provenance: 'control-plane-authorization-required-slice-8',
-  };
-}
-
-export function createAuthorizedWorker(auth: DelegationAuthorization, taskId: string, roleId: string, now = new Date().toISOString()): AuthorizedWorker {
-  if (!auth.organizationId || !auth.workerId || !auth.delegationId || !taskId || !roleId) throw new Error('Authorized worker is missing binding identity');
-  if (!timestampValid(now)) throw new Error('Worker creation timestamp must be valid');
-  return { workerId: auth.workerId, organizationId: auth.organizationId, taskId, delegationId: auth.delegationId, roleId, capabilities: [...auth.authorizedCapabilities], context: { ...auth.authorizedContext }, providerId: auth.providerId, modelId: auth.modelId, risk: auth.risk, status: 'AUTHORIZED', createdAt: now };
-}
-
-export function buildAuthorizedDelegationJobInput(proposal: DelegationProposal, worker: AuthorizedWorker): AuthorizedDelegationJobInput {
-  assertDelegationProposalHasNoAuthority(proposal);
-  if (worker.status !== 'AUTHORIZED') throw new Error('Only an explicitly authorized worker can create a durable execution request');
-  if (worker.organizationId !== proposal.organizationId || worker.taskId !== proposal.task.taskId || worker.delegationId !== proposal.proposalId) throw new Error('Authorized worker does not match delegation proposal');
-  if (!sameScope(worker.context, proposal.requestedContext)) throw new Error('Authorized worker context exceeds delegation context');
+  if (!worker.workerId.trim()) throw new Error('An existing control-plane worker identity is required');
+  if (worker.organizationId !== proposal.organizationId || worker.taskId !== proposal.task.taskId || worker.delegationId !== proposal.proposalId) throw new Error('Control-plane worker binding does not match delegation proposal');
+  if (worker.roleId !== proposal.roleId) throw new Error('Control-plane worker role does not match delegation proposal');
+  if (!sameScope(worker.context, proposal.requestedContext)) throw new Error('Control-plane worker context exceeds delegation context');
   validateCapabilityMatch(proposal.requiredCapabilities, worker.capabilities);
-  if (worker.providerId !== proposal.selectedProviderModel.providerId || worker.modelId !== proposal.selectedProviderModel.modelId) throw new Error('Authorized worker provider/model mismatch');
+  if (worker.providerId !== proposal.selectedProviderModel.providerId || worker.modelId !== proposal.selectedProviderModel.modelId) throw new Error('Control-plane worker provider/model mismatch');
   if (worker.risk !== proposal.risk) throw new Error('Delegation risk cannot be downgraded');
   return {
     organizationId: proposal.organizationId,
@@ -239,7 +182,7 @@ export function buildAuthorizedDelegationJobInput(proposal: DelegationProposal, 
   };
 }
 
-export function validateWorkerResult<TOutput>(worker: AuthorizedWorker, result: WorkerResult<TOutput>): void {
+export function validateWorkerResult<TOutput>(worker: ControlPlaneWorkerBinding, result: WorkerResult<TOutput>): void {
   if (result.workerId !== worker.workerId || result.organizationId !== worker.organizationId || result.taskId !== worker.taskId || result.delegationId !== worker.delegationId) throw new Error('Worker result binding mismatch');
   if (result.provenance.workerId !== worker.workerId || result.provenance.organizationId !== worker.organizationId || result.provenance.taskId !== worker.taskId || result.provenance.delegationId !== worker.delegationId || result.provenance.providerId !== worker.providerId || result.provenance.modelId !== worker.modelId) throw new Error('Worker result provenance mismatch');
   if (!timestampValid(result.startedAt) || !timestampValid(result.completedAt)) throw new Error('Worker result timestamps must be valid');
@@ -254,10 +197,15 @@ export function validateQA(result: WorkerResult, qualityCriteria: readonly strin
   return { decision, reason, qualityCriteria: [...qualityCriteria] };
 }
 
-export class DeterministicTestWorker<TOutput = unknown> implements DeterministicWorkerBehavior<TOutput> {
+/** Test-only result fixture. It is not a production execution boundary. */
+export interface DeterministicTestWorkerBehavior<TOutput = unknown> {
+  execute(input: { worker: ControlPlaneWorkerBinding; context: WorkforceContextScope }): WorkerResult<TOutput>;
+}
+
+export class DeterministicTestWorker<TOutput = unknown> implements DeterministicTestWorkerBehavior<TOutput> {
   constructor(private readonly mode: 'SUCCESS' | 'VALIDATION_FAILURE' | 'WORKER_FAILURE' | 'MALFORMED_RESULT', private readonly output?: TOutput) {}
-  execute(input: { worker: AuthorizedWorker; context: WorkforceContextScope }): WorkerResult<TOutput> {
-    if (input.worker.status !== 'AUTHORIZED') throw new Error('Deterministic test worker requires an authorized worker');
+  execute(input: { worker: ControlPlaneWorkerBinding; context: WorkforceContextScope }): WorkerResult<TOutput> {
+    if (!input.worker.workerId) throw new Error('Deterministic test worker requires an existing worker identity');
     if (!sameScope(input.context, input.worker.context)) throw new Error('Worker context exceeds authorization');
     const startedAt = new Date(0).toISOString();
     const completedAt = new Date(1).toISOString();
