@@ -28,13 +28,10 @@ export {
   OUTCOME_EVALUATION_AUTHORITY,
   OUTCOMES,
   CRITERION_STATES,
-  SUPPORTED_OUTCOME_CRITERION,
   evaluateOutcome,
   isOutcomeEvaluationFailure,
 } from './outcome-evaluation.js';
-export {
-  QA_DECISIONS as OUTCOME_QA_DECISIONS,
-} from './outcome-evaluation.js';
+export { QA_DECISIONS as OUTCOME_QA_DECISIONS } from './outcome-evaluation.js';
 export type {
   Outcome,
   CriterionState,
