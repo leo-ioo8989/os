@@ -158,10 +158,9 @@ test.after(async () => {
 const gateway = (request: Parameters<typeof authorizeExecution>[1]) => authorizeExecution(db, request);
 
 // The task is governed by SOFTWARE_ENGINEERING, while the concrete Phase 1
-// handler requires its own internal.calculate execution capability. The
-// fixture must represent both facts so the real Execution Gateway can perform
-// its authoritative capability check without being weakened.
-const executionCapabilities = ['SOFTWARE_ENGINEERING', 'internal.calculate'];
+// handler requires internal.execute. The fixture represents both facts so the
+// real Execution Gateway can perform its authoritative capability check.
+const executionCapabilities = ['SOFTWARE_ENGINEERING', 'internal.execute'];
 
 test('Slice 8 delegation reaches the durable Phase 1 path through the production control-plane bridge', async (t) => {
   if (!process.env.DATABASE_URL) {
@@ -194,16 +193,16 @@ test('Slice 8 delegation reaches the durable Phase 1 path through the production
     const task = await db.task.create({
       data: {
         objectiveId: objective.id,
-        title: 'delegated calculation',
-        description: 'delegated calculation',
+        title: 'delegated noop',
+        description: 'delegated deterministic noop',
         status: 'PENDING',
         metadata: {
-          handlerId: 'internal.calculate',
-          capability: 'internal.calculate',
-          action: 'calculate',
+          handlerId: 'internal.noop',
+          capability: 'internal.execute',
+          action: 'execute',
           target: 'internal',
           risk: 'LOW',
-          parameters: { a: 2, b: 3, operation: 'add' },
+          parameters: {},
         },
       },
     });
@@ -280,16 +279,16 @@ test('duplicate Slice 8 delegation reuses durable Job idempotency', async (t) =>
     const task = await db.task.create({
       data: {
         objectiveId: objective.id,
-        title: 'delegated calculation',
-        description: 'delegated calculation',
+        title: 'delegated noop',
+        description: 'delegated deterministic noop',
         status: 'PENDING',
         metadata: {
-          handlerId: 'internal.calculate',
-          capability: 'internal.calculate',
-          action: 'calculate',
+          handlerId: 'internal.noop',
+          capability: 'internal.execute',
+          action: 'execute',
           target: 'internal',
           risk: 'LOW',
-          parameters: { a: 4, b: 5, operation: 'add' },
+          parameters: {},
         },
       },
     });
