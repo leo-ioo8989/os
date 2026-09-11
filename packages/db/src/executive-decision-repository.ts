@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ExecutiveContinuationDecision } from '@founder-os/core';
 import { AUDIT_EVENTS, sanitizeAuditMetadata } from './audit.js';
 
@@ -44,10 +44,7 @@ function toDecision(metadata: unknown, createdAt: Date): DurableExecutiveDecisio
   };
 }
 
-/**
- * Durable executive history uses the existing append-only audit authority.
- * It records proposals only; it never changes objective/workflow/job state.
- */
+/** Durable executive history uses the existing append-only audit authority. */
 export async function recordExecutiveContinuation(db: PrismaClient, decision: ExecutiveContinuationDecision): Promise<DurableExecutiveDecision> {
   if (decision.authority !== 'PROPOSAL_ONLY') throw new Error('Only proposal-only executive decisions may be persisted.');
   const existing = await getExecutiveContinuation(db, decision.organizationId, decision.continuationId);
@@ -77,7 +74,7 @@ export async function recordExecutiveContinuation(db: PrismaClient, decision: Ex
         authority: decision.authority,
         provenance: decision.provenance,
         nextProposal: decision.nextProposal,
-      }) as object,
+      }) as Prisma.InputJsonValue,
     },
   });
   const recorded = toDecision(event.metadata, event.createdAt);
