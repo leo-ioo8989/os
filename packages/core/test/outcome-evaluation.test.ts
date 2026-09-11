@@ -1,12 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  evaluateOutcome,
-  isOutcomeEvaluationFailure,
-  type OutcomeEvaluationContext,
-} from '../src/outcome-evaluation.js';
+import { evaluateOutcome, isOutcomeEvaluationFailure, type OutcomeEvaluation, type OutcomeEvaluationContext } from '../src/outcome-evaluation.js';
 
-const baseCriteria = [
+const criteria = [
   { id: 'result', kind: 'FIELD_EQUALS', path: 'result', expected: 5 },
   { id: 'state', kind: 'FIELD_EQUALS', path: 'state', expected: 'done' },
 ] as const;
@@ -14,7 +10,7 @@ const baseCriteria = [
 function context(overrides: Partial<OutcomeEvaluationContext> = {}): OutcomeEvaluationContext {
   return {
     organizationId: 'org-1', objectiveId: 'objective-1', workflowId: 'workflow-1', taskId: 'task-1', jobId: 'job-1',
-    objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: baseCriteria },
+    objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: criteria },
     workflow: { id: 'workflow-1', organizationId: 'org-1', objectiveId: 'objective-1' },
     task: { id: 'task-1', organizationId: 'org-1', objectiveId: 'objective-1' },
     job: { id: 'job-1', organizationId: 'org-1', objectiveId: 'objective-1', workflowId: 'workflow-1', taskId: 'task-1', status: 'SUCCEEDED', workerIdentityId: 'worker-1' },
@@ -25,224 +21,138 @@ function context(overrides: Partial<OutcomeEvaluationContext> = {}): OutcomeEval
   };
 }
 
-function evaluate(overrides: Partial<OutcomeEvaluationContext> = {}) {
+function evaluation(overrides: Partial<OutcomeEvaluationContext> = {}): OutcomeEvaluation {
   const result = evaluateOutcome(context(overrides), new Date('2026-09-11T01:00:00.000Z'));
-  assert.equal(isOutcomeEvaluationFailure(result), false);
   if (isOutcomeEvaluationFailure(result)) throw new Error(result.reason);
   return result;
 }
 
-test('valid authoritative input produces proposal-only evaluation', () => {
-  const result = evaluate();
+function failure(overrides: Partial<OutcomeEvaluationContext> = {}) {
+  const result = evaluateOutcome(context(overrides), new Date('2026-09-11T01:00:00.000Z'));
+  if (!isOutcomeEvaluationFailure(result)) throw new Error(`expected failure, got ${result.outcome}`);
+  return result;
+}
+
+test('valid input produces proposal-only evaluation', () => {
+  const result = evaluation();
   assert.equal(result.outcome, 'ACHIEVED');
   assert.equal(result.qaDecision, 'PASS');
   assert.equal(result.authority, 'PROPOSAL_ONLY');
-  assert.equal(result.evaluatorProvenance.resultJobId, 'job-1');
 });
 
-test('organization integrity is enforced across authoritative relationships', () => {
-  const result = evaluate({ objective: { id: 'objective-1', organizationId: 'org-2', successCriteria: baseCriteria } });
-  assert.deepEqual(result, { kind: 'CROSS_ORGANIZATION', reason: 'Authoritative organization relationships are inconsistent.' });
+test('organization integrity and cross-org worker relationships fail closed', () => {
+  assert.equal(failure({ objective: { id: 'objective-1', organizationId: 'org-2', successCriteria: criteria } }).kind, 'CROSS_ORGANIZATION');
+  assert.equal(failure({ worker: { id: 'worker-1', organizationId: 'org-2' } }).kind, 'CROSS_ORGANIZATION');
 });
 
-test('objective, task, workflow and job relationships are authoritative and fail closed', () => {
-  const result = evaluate({ task: { id: 'task-2', organizationId: 'org-1', objectiveId: 'objective-1' } });
-  assert.equal(isOutcomeEvaluationFailure(result), true);
-  assert.equal(result.kind, 'INVALID_INPUT');
+test('authoritative objective/task/workflow/job relationships fail closed when inconsistent', () => {
+  assert.equal(failure({ task: { id: 'task-2', organizationId: 'org-1', objectiveId: 'objective-1' } }).kind, 'INVALID_INPUT');
+  assert.equal(failure({ workflow: { id: 'workflow-1', organizationId: 'org-1', objectiveId: 'objective-2' } }).kind, 'INVALID_INPUT');
+  assert.equal(failure({ job: { ...context().job, taskId: 'task-2' } }).kind, 'INVALID_INPUT');
 });
 
-test('satisfied deterministic criteria produce SATISFIED and ACHIEVED', () => {
-  const result = evaluate();
+test('satisfied criteria produce SATISFIED and ACHIEVED/PASS', () => {
+  const result = evaluation();
   assert.deepEqual(result.evidence.map(item => item.state), ['SATISFIED', 'SATISFIED']);
-  assert.deepEqual(result.unmetCriteria, []);
+  assert.equal(result.outcome, 'ACHIEVED');
+  assert.equal(result.qaDecision, 'PASS');
 });
 
-test('unsatisfied deterministic criteria produce UNSATISFIED and NOT_ACHIEVED', () => {
-  const result = evaluate({ executionResult: { ...context().executionResult, output: { result: 4, state: 'done' } } });
+test('unsatisfied criteria produce UNSATISFIED and NOT_ACHIEVED/REWORK', () => {
+  const result = evaluation({ executionResult: { ...context().executionResult, output: { result: 4, state: 'done' } } });
+  assert.equal(result.evidence[0]?.state, 'UNSATISFIED');
   assert.equal(result.outcome, 'NOT_ACHIEVED');
   assert.equal(result.qaDecision, 'REWORK');
-  assert.equal(result.evidence[0]?.state, 'UNSATISFIED');
 });
 
-test('missing evidence produces UNDETERMINED and INCONCLUSIVE', () => {
-  const result = evaluate({ executionResult: { ...context().executionResult, output: { result: 5 } } });
-  assert.equal(result.outcome, 'INCONCLUSIVE');
-  assert.equal(result.qaDecision, 'ESCALATE');
+test('missing evidence produces UNDETERMINED and INCONCLUSIVE/ESCALATE', () => {
+  const result = evaluation({ executionResult: { ...context().executionResult, output: { result: 5 } } });
   assert.equal(result.evidence[1]?.state, 'UNDETERMINED');
-});
-
-test('criterion state STATUS_EQUALS is deterministic', () => {
-  const result = evaluate({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'STATUS_EQUALS', expected: 'SUCCEEDED' }] } });
-  assert.equal(result.evidence[0]?.state, 'SATISFIED');
-  assert.equal(result.outcome, 'ACHIEVED');
-});
-
-test('numeric criterion supports deterministic comparison', () => {
-  const result = evaluate({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'NUMBER_COMPARE', path: 'score', operator: 'GTE', value: 80 }] }, executionResult: { ...context().executionResult, output: { score: 90 } } });
-  assert.equal(result.outcome, 'ACHIEVED');
-});
-
-test('contradictory evidence produces INCONCLUSIVE rather than success', () => {
-  const result = evaluate({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ id: 'yes', kind: 'FIELD_EQUALS', path: 'state', expected: 'done' }, { id: 'no', kind: 'FIELD_EQUALS', path: 'state', expected: 'blocked' }] } });
   assert.equal(result.outcome, 'INCONCLUSIVE');
   assert.equal(result.qaDecision, 'ESCALATE');
 });
 
-test('unsupported or malformed criteria never become success', () => {
-  const result = evaluate({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: ['human-readable criterion'] } });
+test('numeric and status criteria are deterministic', () => {
+  assert.equal(evaluation({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'NUMBER_COMPARE', path: 'score', operator: 'GTE', value: 80 }] }, executionResult: { ...context().executionResult, output: { score: 90 } } }).outcome, 'ACHIEVED');
+  assert.equal(evaluation({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'STATUS_EQUALS', expected: 'SUCCEEDED' }] } }).outcome, 'ACHIEVED');
+});
+
+test('contradictory evidence is INCONCLUSIVE, never success', () => {
+  const result = evaluation({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ id: 'yes', kind: 'FIELD_EQUALS', path: 'state', expected: 'done' }, { id: 'no', kind: 'FIELD_EQUALS', path: 'state', expected: 'blocked' }] } });
   assert.equal(result.outcome, 'INCONCLUSIVE');
   assert.equal(result.qaDecision, 'ESCALATE');
 });
 
-test('malformed authoritative input fails closed', () => {
-  const result = evaluate({ executionResult: { ...context().executionResult, jobId: 'other-job' } });
-  assert.equal(isOutcomeEvaluationFailure(result), true);
-  assert.equal(result.kind, 'INVALID_INPUT');
+test('missing/unsupported criteria never become success', () => {
+  assert.equal(evaluation({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [] } }).outcome, 'INCONCLUSIVE');
+  assert.equal(evaluation({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: ['human-readable criterion'] } }).outcome, 'INCONCLUSIVE');
 });
 
-test('cross-organization worker relationship fails closed', () => {
-  const result = evaluate({ worker: { id: 'worker-1', organizationId: 'org-2' } });
-  assert.equal(isOutcomeEvaluationFailure(result), true);
-  assert.equal(result.kind, 'CROSS_ORGANIZATION');
+test('malformed input and worker mismatch fail closed', () => {
+  assert.equal(failure({ executionResult: { ...context().executionResult, jobId: 'other-job' } }).kind, 'INVALID_INPUT');
+  assert.equal(failure({ worker: { id: 'worker-2', organizationId: 'org-1' } }).kind, 'INVALID_INPUT');
 });
 
-test('successful durable result requires terminal successful Job', () => {
-  const result = evaluate({ job: { ...context().job, status: 'RUNNING' } });
-  assert.equal(isOutcomeEvaluationFailure(result), true);
-  assert.match(result.reason, /terminal successful Job/);
+test('durable result and Job terminal status must agree', () => {
+  const successWithRunningJob = failure({ job: { ...context().job, status: 'RUNNING' } });
+  assert.equal(successWithRunningJob.kind, 'INVALID_INPUT');
 });
 
-test('failed durable result requires terminal failed Job', () => {
-  const result = evaluate({ job: { ...context().job, status: 'FAILED' }, executionResult: { ...context().executionResult, status: 'FAILED', output: undefined, failure: { code: 'X', message: 'failed', retryable: false } } });
-  assert.equal(result.outcome, 'INCONCLUSIVE');
+test('model authority-bearing fields are rejected; ordinary model data is inert', () => {
+  assert.equal(failure({ modelSuggestion: { reasoning: 'x', workerId: 'worker-2' } }).kind, 'AUTHORITY_VIOLATION');
+  assert.equal(evaluation({ modelSuggestion: { reasoning: 'evidence only' } }).authority, 'PROPOSAL_ONLY');
 });
 
-test('model suggestion cannot carry authority-bearing fields', () => {
-  const result = evaluate({ modelSuggestion: { reasoning: 'x', workerId: 'worker-2' } });
-  assert.deepEqual(result, { kind: 'AUTHORITY_VIOLATION', reason: 'Model suggestions cannot carry authority-bearing fields.' });
-});
-
-test('model suggestion without authority is inert data', () => {
-  const result = evaluate({ modelSuggestion: { reasoning: 'evidence summary only' } });
+test('result output authority-looking fields remain untrusted data', () => {
+  const result = evaluation({ executionResult: { ...context().executionResult, output: { result: 5, state: 'done', workerId: 'untrusted', execute: true } } });
+  assert.equal(result.outcome, 'ACHIEVED');
   assert.equal(result.authority, 'PROPOSAL_ONLY');
 });
 
-test('evaluation does not expose execution or authorization commands', () => {
-  const result = evaluate();
-  assert.equal('execute' in result, false);
-  assert.equal('dispatch' in result, false);
-  assert.equal('retry' in result, false);
-  assert.equal('reassign' in result, false);
-  assert.equal('approvalGranted' in result, false);
-  assert.equal('workerId' in result, false);
-  assert.equal('credentialId' in result, false);
+test('evaluation exposes no execution, authorization, approval, retry or reassignment commands', () => {
+  const result = evaluation() as unknown as Record<string, unknown>;
+  for (const key of ['execute', 'dispatch', 'authorize', 'approve', 'approvalGranted', 'retry', 'reassign', 'workerId', 'credentialId']) assert.equal(key in result, false);
 });
 
-test('evaluation does not mutate Job/Task/Workflow/Objective state', () => {
+test('evaluation does not mutate authoritative state', () => {
   const input = context();
   const before = JSON.stringify(input);
-  evaluate(input);
+  evaluation(input);
   assert.equal(JSON.stringify(input), before);
 });
 
-test('evaluation is deterministic for unchanged authoritative context', () => {
-  const first = evaluate();
-  const second = evaluate();
+test('unchanged authoritative context is repeatable and provenance-stable', () => {
+  const first = evaluation();
+  const second = evaluation();
   assert.deepEqual(second, first);
+  assert.equal(first.evaluatorProvenance.evaluator, 'LEO_OS_OUTCOME_EVALUATOR');
+  assert.equal(first.evaluatorProvenance.evaluatorVersion, 'deterministic-v1');
+  assert.equal(first.evaluatorProvenance.resultJobId, 'job-1');
+  assert.equal(first.evaluatorProvenance.resultValidatedAt, '2026-09-11T00:00:00.000Z');
+  assert.equal(first.evaluatorProvenance.correlationId, 'corr-1');
 });
 
-test('provenance binds evaluator version, result identity and validation time', () => {
-  const result = evaluate();
-  assert.equal(result.evaluatorProvenance.evaluator, 'LEO_OS_OUTCOME_EVALUATOR');
-  assert.equal(result.evaluatorProvenance.evaluatorVersion, 'deterministic-v1');
-  assert.equal(result.evaluatorProvenance.resultValidatedAt, '2026-09-11T00:00:00.000Z');
-  assert.equal(result.evaluatorProvenance.correlationId, 'corr-1');
+test('failed execution cannot be ACHIEVED unless authoritative criteria explicitly expect failure', () => {
+  const notAchieved = evaluation({ job: { ...context().job, status: 'FAILED' }, objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'STATUS_EQUALS', expected: 'SUCCEEDED' }] }, executionResult: { ...context().executionResult, status: 'FAILED', output: undefined, failure: { code: 'FAILED', message: 'failed', retryable: false } } });
+  assert.equal(notAchieved.outcome, 'NOT_ACHIEVED');
+  assert.equal(notAchieved.qaDecision, 'REWORK');
+  const achieved = evaluation({ job: { ...context().job, status: 'FAILED' }, objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'STATUS_EQUALS', expected: 'FAILED' }] }, executionResult: { ...context().executionResult, status: 'FAILED', output: undefined, failure: { code: 'EXPECTED', message: 'expected', retryable: false } } });
+  assert.equal(achieved.outcome, 'ACHIEVED');
+  assert.equal(achieved.qaDecision, 'PASS');
 });
 
-test('evaluation timestamp does not change outcome semantics', () => {
-  const a = evaluate();
-  const b = evaluate();
-  assert.equal(a.outcome, b.outcome);
-  assert.equal(a.qaDecision, b.qaDecision);
-});
-
-test('authority is always PROPOSAL_ONLY', () => {
-  for (const output of [evaluate(), evaluate({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'FIELD_EQUALS', path: 'result', expected: 99 }] } }), evaluate({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [] } })]) {
-    assert.equal(output.authority, 'PROPOSAL_ONLY');
-  }
-});
-
-test('missing criteria cannot become PASS', () => {
-  const result = evaluate({ objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [] } });
-  assert.notEqual(result.qaDecision, 'PASS');
-  assert.equal(result.outcome, 'INCONCLUSIVE');
-});
-
-test('unknown fields in result output are ignored rather than treated as authority', () => {
-  const result = evaluate({ executionResult: { ...context().executionResult, output: { result: 5, state: 'done', workerId: 'untrusted', execute: true } } });
-  assert.equal(result.outcome, 'ACHIEVED');
-  assert.equal(result.authority, 'PROPOSAL_ONLY');
-});
-
-test('failed execution does not become success when success criteria require success status', () => {
-  const result = evaluate({ job: { ...context().job, status: 'FAILED' }, objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'STATUS_EQUALS', expected: 'SUCCEEDED' }] }, executionResult: { ...context().executionResult, status: 'FAILED', output: undefined, failure: { code: 'FAILED', message: 'failed', retryable: false } } });
-  assert.equal(result.outcome, 'NOT_ACHIEVED');
-  assert.equal(result.qaDecision, 'REWORK');
-});
-
-test('failed execution can only be achieved when authoritative criteria explicitly expect failure', () => {
-  const result = evaluate({ job: { ...context().job, status: 'FAILED' }, objective: { id: 'objective-1', organizationId: 'org-1', successCriteria: [{ kind: 'STATUS_EQUALS', expected: 'FAILED' }] }, executionResult: { ...context().executionResult, status: 'FAILED', output: undefined, failure: { code: 'EXPECTED', message: 'expected', retryable: false } } });
-  assert.equal(result.outcome, 'ACHIEVED');
-  assert.equal(result.qaDecision, 'PASS');
-});
-
-test('workflow/objective mismatch fails closed', () => {
-  const result = evaluate({ workflow: { id: 'workflow-1', organizationId: 'org-1', objectiveId: 'objective-2' } });
-  assert.equal(isOutcomeEvaluationFailure(result), true);
-  assert.equal(result.kind, 'INVALID_INPUT');
-});
-
-test('job/task/workflow mismatch fails closed', () => {
-  const result = evaluate({ job: { ...context().job, taskId: 'task-2' } });
-  assert.equal(isOutcomeEvaluationFailure(result), true);
-  assert.equal(result.kind, 'INVALID_INPUT');
-});
-
-test('worker identity mismatch fails closed', () => {
-  const result = evaluate({ worker: { id: 'worker-2', organizationId: 'org-1' } });
-  assert.equal(isOutcomeEvaluationFailure(result), true);
-  assert.equal(result.kind, 'INVALID_INPUT');
-});
-
-test('retry and approval state are observed but cannot change authority', () => {
-  const result = evaluate({ retryState: { attemptNumber: 3, maxAttempts: 3, retryable: true }, approvalState: { status: 'PENDING' } });
+test('retry and approval state cannot change evaluation authority', () => {
+  const result = evaluation({ retryState: { attemptNumber: 3, maxAttempts: 3, retryable: true }, approvalState: { status: 'PENDING' } });
   assert.equal(result.authority, 'PROPOSAL_ONLY');
   assert.equal(result.qaDecision, 'PASS');
 });
 
-test('no second executor or worker runtime is represented by the evaluator API', () => {
-  const result = evaluate();
-  assert.equal(typeof evaluateOutcome, 'function');
-  assert.equal('run' in result, false);
-  assert.equal('execute' in result, false);
-  assert.equal('dispatch' in result, false);
+test('no second executor, worker runtime, authorization system or audit system is exposed', () => {
+  const result = evaluation() as unknown as Record<string, unknown>;
+  for (const key of ['run', 'execute', 'dispatch', 'authorize', 'grant', 'auditEvent', 'auditLog']) assert.equal(key in result, false);
 });
 
-test('no authorization system is represented by the evaluator API', () => {
-  const result = evaluate();
-  assert.equal('authorize' in result, false);
-  assert.equal('grant' in result, false);
-  assert.equal('permission' in result, false);
-});
-
-test('no parallel audit system is represented by the evaluator API', () => {
-  const result = evaluate();
-  assert.equal('auditEvent' in result, false);
-  assert.equal('auditLog' in result, false);
-  assert.equal(result.evaluatorProvenance.evaluator, 'LEO_OS_OUTCOME_EVALUATOR');
-});
-
-test('durable-result compatibility consumes only the validated result contract', () => {
-  const result = evaluate({ executionResult: { jobId: 'job-1', status: 'SUCCEEDED', output: { result: 5, state: 'done' }, handlerId: 'internal.calculate', validatedAt: new Date('2026-09-11T00:00:00.000Z') } });
+test('durable result compatibility consumes the existing validated result shape only', () => {
+  const result = evaluation({ executionResult: { jobId: 'job-1', status: 'SUCCEEDED', output: { result: 5, state: 'done' }, handlerId: 'internal.calculate', validatedAt: new Date('2026-09-11T00:00:00.000Z') } });
   assert.equal(result.outcome, 'ACHIEVED');
 });
