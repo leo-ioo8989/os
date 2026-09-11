@@ -23,3 +23,4 @@ export * from './model-runtime.js';
 export * from './leo-executive.js';
 export * from './workforce.js';
 export * from './delegation.js';
+export * from './outcome-evaluation.js';
