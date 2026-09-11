@@ -34,11 +34,7 @@ export interface DelegationProposal {
   provenance: string;
 }
 
-/**
- * Data supplied by the authoritative control-plane worker identity boundary.
- * Slice #8 may validate this binding, but it does not create, activate, or
- * authorize the worker. ExecutionGateway/WorkerRepository remain authoritative.
- */
+/** Data supplied by the authoritative control-plane worker identity boundary. */
 export interface ControlPlaneWorkerBinding {
   workerId: string;
   organizationId: string;
@@ -50,22 +46,19 @@ export interface ControlPlaneWorkerBinding {
   providerId: string;
   modelId: string;
   risk: ExecutionRisk;
+  workflowId?: string;
 }
 
 export interface AuthorizedDelegationJobInput {
   organizationId: string;
   taskId: string;
+  workflowId?: string;
   workerIdentityId: string;
   idempotencyKey: string;
   metadata: Readonly<Record<string, unknown>>;
 }
 
-export interface WorkerResultFailure {
-  code: string;
-  message: string;
-  retryable: boolean;
-}
-
+export interface WorkerResultFailure { code: string; message: string; retryable: boolean; }
 export interface WorkerResult<TOutput = unknown> {
   workerId: string;
   organizationId: string;
@@ -74,38 +67,18 @@ export interface WorkerResult<TOutput = unknown> {
   status: 'SUCCEEDED' | 'FAILED';
   output?: TOutput;
   failure?: WorkerResultFailure;
-  provenance: {
-    workerId: string;
-    organizationId: string;
-    taskId: string;
-    delegationId: string;
-    providerId: string;
-    modelId: string;
-  };
+  provenance: { workerId: string; organizationId: string; taskId: string; delegationId: string; providerId: string; modelId: string };
   startedAt: string;
   completedAt: string;
 }
-
-export interface QAResult {
-  decision: QADecision;
-  reason: string;
-  qualityCriteria: readonly string[];
-}
+export interface QAResult { decision: QADecision; reason: string; qualityCriteria: readonly string[]; }
 
 function timestampValid(value: string): boolean { return Number.isFinite(Date.parse(value)); }
 function sameScope(a: WorkforceContextScope, b: WorkforceContextScope): boolean {
   return a.organization === b.organization && a.businessId === b.businessId && a.projectId === b.projectId && a.departmentId === b.departmentId && a.workingContext === b.workingContext;
 }
 
-export function buildDelegationProposal(
-  organizationId: string,
-  ownerUserId: string,
-  correlationId: string,
-  selection: WorkforceSelectionProposal,
-  task: WorkforceTaskRequirement,
-  role: WorkforceRole,
-  capabilityContract: CapabilityContract,
-): DelegationProposal {
+export function buildDelegationProposal(organizationId: string, ownerUserId: string, correlationId: string, selection: WorkforceSelectionProposal, task: WorkforceTaskRequirement, role: WorkforceRole, capabilityContract: CapabilityContract): DelegationProposal {
   if (selection.authority !== 'PROPOSAL_ONLY') throw new Error('Workforce selection must remain proposal-only');
   assertWorkforceProposalHasNoAuthority(selection);
   if (selection.organizationId !== organizationId || task.organizationId !== organizationId || role.organizationId !== organizationId) throw new Error('Delegation organization boundary violated');
@@ -148,11 +121,7 @@ export function assertDelegationProposalHasNoAuthority(proposal: DelegationPropo
   }
 }
 
-/**
- * Builds the durable Job payload from an already-authoritative control-plane
- * worker binding. This function deliberately performs no authorization,
- * approval, worker activation, credential lookup, or execution.
- */
+/** Builds a durable Job payload from an already-authoritative control-plane worker binding. */
 export function buildDelegationJobInput(proposal: DelegationProposal, worker: ControlPlaneWorkerBinding): AuthorizedDelegationJobInput {
   assertDelegationProposalHasNoAuthority(proposal);
   if (!worker.workerId.trim()) throw new Error('An existing control-plane worker identity is required');
@@ -165,6 +134,7 @@ export function buildDelegationJobInput(proposal: DelegationProposal, worker: Co
   return {
     organizationId: proposal.organizationId,
     taskId: proposal.task.taskId,
+    workflowId: worker.workflowId,
     workerIdentityId: worker.workerId,
     idempotencyKey: proposal.idempotencyKey,
     metadata: {
@@ -197,18 +167,14 @@ export function validateQA(result: WorkerResult, qualityCriteria: readonly strin
   return { decision, reason, qualityCriteria: [...qualityCriteria] };
 }
 
-/** Test-only result fixture. It is not a production execution boundary. */
-export interface DeterministicTestWorkerBehavior<TOutput = unknown> {
-  execute(input: { worker: ControlPlaneWorkerBinding; context: WorkforceContextScope }): WorkerResult<TOutput>;
-}
-
+/** Test-only result fixture; it is not a production execution boundary. */
+export interface DeterministicTestWorkerBehavior<TOutput = unknown> { execute(input: { worker: ControlPlaneWorkerBinding; context: WorkforceContextScope }): WorkerResult<TOutput>; }
 export class DeterministicTestWorker<TOutput = unknown> implements DeterministicTestWorkerBehavior<TOutput> {
   constructor(private readonly mode: 'SUCCESS' | 'VALIDATION_FAILURE' | 'WORKER_FAILURE' | 'MALFORMED_RESULT', private readonly output?: TOutput) {}
   execute(input: { worker: ControlPlaneWorkerBinding; context: WorkforceContextScope }): WorkerResult<TOutput> {
     if (!input.worker.workerId) throw new Error('Deterministic test worker requires an existing worker identity');
     if (!sameScope(input.context, input.worker.context)) throw new Error('Worker context exceeds authorization');
-    const startedAt = new Date(0).toISOString();
-    const completedAt = new Date(1).toISOString();
+    const startedAt = new Date(0).toISOString(); const completedAt = new Date(1).toISOString();
     const base = { workerId: input.worker.workerId, organizationId: input.worker.organizationId, taskId: input.worker.taskId, delegationId: input.worker.delegationId, provenance: { workerId: input.worker.workerId, organizationId: input.worker.organizationId, taskId: input.worker.taskId, delegationId: input.worker.delegationId, providerId: input.worker.providerId, modelId: input.worker.modelId }, startedAt, completedAt };
     if (this.mode === 'SUCCESS') return { ...base, status: 'SUCCEEDED', output: this.output };
     if (this.mode === 'VALIDATION_FAILURE') return { ...base, status: 'SUCCEEDED', output: this.output };
