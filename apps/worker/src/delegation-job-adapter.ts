@@ -4,23 +4,10 @@ import { JobDispatcher } from './job-dispatcher.js';
 import { WorkerRuntime, type ExecutionAuthorizer, type ApprovalConsumer, type WorkerRunResult } from './worker-runtime.js';
 import { buildDelegationJobInput, type ControlPlaneWorkerBinding, type DelegationProposal } from '@founder-os/core';
 
-export interface DelegationJobAdapterResult {
-  kind: 'created' | 'existing' | 'not_dispatchable';
-  jobId: string;
-  workerId: string;
-}
+export interface DelegationJobAdapterResult { kind: 'created' | 'existing' | 'not_dispatchable'; jobId: string; workerId: string; }
+export interface DelegationExecutionResult { job: DelegationJobAdapterResult; run: WorkerRunResult | null; }
 
-export interface DelegationExecutionResult {
-  job: DelegationJobAdapterResult;
-  run: WorkerRunResult | null;
-}
-
-/**
- * Thin Slice #8 adapter. It only bridges a control-plane worker binding into
- * the existing Phase 1 durable Job/Dispatcher/WorkerRuntime architecture.
- * Authorization remains in ExecutionGateway and worker identity remains in
- * WorkerRepository; this adapter grants neither.
- */
+/** Thin Slice #8 bridge into the existing Phase 1 durable execution architecture. */
 export class DelegationJobAdapter {
   private readonly jobs: JobService;
   private readonly dispatcher: JobDispatcher;
@@ -34,13 +21,13 @@ export class DelegationJobAdapter {
 
   async enqueue(proposal: DelegationProposal, worker: ControlPlaneWorkerBinding): Promise<DelegationJobAdapterResult> {
     const input = buildDelegationJobInput(proposal, worker);
-    const job = await this.jobs.create({ organizationId: input.organizationId, taskId: input.taskId, workerIdentityId: input.workerIdentityId, idempotencyKey: input.idempotencyKey, metadata: input.metadata as Record<string, unknown> });
+    const job = await this.jobs.create({ organizationId: input.organizationId, taskId: input.taskId, workflowId: input.workflowId, workerIdentityId: input.workerIdentityId, idempotencyKey: input.idempotencyKey, metadata: input.metadata as Record<string, unknown> });
     if (!job) throw new Error('Delegation could not create a same-organization durable job');
-    return { kind: job.idempotencyKey === input.idempotencyKey ? 'created' : 'existing', jobId: job.id, workerId: worker.workerId };
+    return { kind: 'created', jobId: job.id, workerId: worker.workerId };
   }
 
-  async dispatch(organizationId: string, jobId: string, workerId: string): Promise<DelegationJobAdapterResult> {
-    const result = await this.dispatcher.dispatchNext(organizationId);
+  async dispatch(organizationId: string, jobId: string, workerId: string, workflowId?: string): Promise<DelegationJobAdapterResult> {
+    const result = await this.dispatcher.dispatchNext(organizationId, workflowId);
     if (result.kind !== 'dispatched' || result.jobId !== jobId || result.workerId !== workerId) return { kind: 'not_dispatchable', jobId, workerId };
     return { kind: 'created', jobId, workerId };
   }
@@ -49,14 +36,10 @@ export class DelegationJobAdapter {
     return this.runtime.run(organizationId, jobId, workerId, credential, approvalId);
   }
 
-  /**
-   * Production Slice #8 entry point. The supplied worker binding must already
-   * originate from the control-plane worker identity boundary. The method then
-   * invokes only the existing durable Job → Dispatcher → WorkerRuntime path.
-   */
+  /** Production Slice #8 entry point; every execution step delegates to Phase 1 services. */
   async executeDelegation(proposal: DelegationProposal, worker: ControlPlaneWorkerBinding, credential: string, approvalId?: string): Promise<DelegationExecutionResult> {
     const job = await this.enqueue(proposal, worker);
-    const dispatched = await this.dispatch(worker.organizationId, job.jobId, worker.workerId);
+    const dispatched = await this.dispatch(worker.organizationId, job.jobId, worker.workerId, worker.workflowId);
     if (dispatched.kind !== 'created') return { job: dispatched, run: null };
     const run = await this.run(worker.organizationId, dispatched.jobId, dispatched.workerId, credential, approvalId);
     return { job: dispatched, run };
