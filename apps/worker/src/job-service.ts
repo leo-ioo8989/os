@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@founder-os/db';
 import { AUDIT_EVENTS, JobRepository, WorkerRepository, recordAuditEvent, type AuditEventType } from '@founder-os/db';
 import type { JobStatus } from '@founder-os/core';
+import type { ExecutionHandlerResult } from './execution-handlers.js';
 
 export class JobService {
   private readonly repository: JobRepository;
@@ -17,7 +18,9 @@ export class JobService {
   resolveApproval(organizationId:string,id:string,approved:boolean){return this.repository.resolveApproval(organizationId,id,approved,{organizationId,actorType:'SYSTEM',eventType:approved?AUDIT_EVENTS.EXECUTION_APPROVED:AUDIT_EVENTS.EXECUTION_REJECTED,action:approved?'approval_granted':'approval_rejected',result:approved?'SUCCESS':'DENIED'});}
   heartbeat(organizationId:string,id:string,workerId:string,leaseMs=30000){return this.repository.heartbeat(organizationId,id,workerId,leaseMs)}
   succeed(organizationId:string,id:string,workerId:string){return this.repository.transition(organizationId,id,'RUNNING','SUCCEEDED',workerId,{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.JOB_SUCCEEDED,action:'succeed',result:'SUCCESS',metadata:{workerId}});}
+  succeedWithResult(organizationId:string,id:string,workerId:string,result:ExecutionHandlerResult,handlerId:string){return this.repository.transition(organizationId,id,'RUNNING','SUCCEEDED',workerId,{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.JOB_SUCCEEDED,action:'succeed',result:'SUCCESS',metadata:{workerId,handlerId}},new Date(),undefined,{status:'SUCCEEDED',output:result.output,handlerId,validatedAt:new Date()});}
   fail(organizationId:string,id:string,workerId:string,code:string,message:string,retryable:boolean){return this.repository.fail(organizationId,id,workerId,{code,message,retryable},{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.JOB_FAILED,action:'fail',result:'FAILURE',metadata:{workerId,code,retryable}});}
+  failWithResult(organizationId:string,id:string,workerId:string,result:ExecutionHandlerResult,handlerId:string){const error=result.error!;return this.repository.fail(organizationId,id,workerId,{code:error.code,message:error.message,retryable:error.retryable},{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.JOB_FAILED,action:'fail',result:'FAILURE',metadata:{workerId,code:error.code,retryable:error.retryable,handlerId}},{...undefined},{status:'FAILED',error,handlerId,validatedAt:new Date()});}
   cancel(organizationId:string,id:string,workerId:string){return this.repository.transition(organizationId,id,'RUNNING','CANCELLED',workerId,{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.JOB_CANCELLED,action:'cancel',result:'SUCCESS',metadata:{workerId}});}
   recoverStale(organizationId:string,id:string){return this.repository.recoverStale(organizationId,id,{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.JOB_STALE_LEASE_RECOVERED,action:'recover_stale',result:'SUCCESS'});}
   checkpoint(organizationId:string,id:string,workerId:string,state:Record<string,unknown>){return this.repository.checkpoint(organizationId,id,state,workerId,{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.JOB_CHECKPOINT_CREATED,action:'checkpoint',result:'SUCCESS',metadata:{workerId}});}
