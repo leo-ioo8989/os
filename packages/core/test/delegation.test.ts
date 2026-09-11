@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as core from '../src/index.js';
 import { WorkforceRegistry, buildWorkforceSelectionProposal, buildDelegationProposal, buildDelegationJobInput, DeterministicTestWorker, validateWorkerResult, validateQA, type CapabilityDefinition, type WorkforceRole, type ProviderDefinition, type WorkforceModelDefinition, type WorkforceTaskRequirement, type ControlPlaneWorkerBinding } from '../src/index.js';
 
 const scope={organization:true as const,projectId:'project-a'};
@@ -12,7 +13,7 @@ function proposalFor(t=task()) { const r=new WorkforceRegistry(); r.registerCapa
 function bindingFor(t=task(), overrides:Partial<ControlPlaneWorkerBinding>={}) { const proposal=proposalFor(t); return { proposal, binding: { workerId:'worker-a',organizationId:'org-a',taskId:t.taskId,delegationId:proposal.proposalId,roleId:'engineer',capabilities:['SOFTWARE_ENGINEERING'],context:scope,providerId:'provider-test',modelId:'model-test',risk:t.risk,...overrides } satisfies ControlPlaneWorkerBinding }; }
 
 test('delegation proposal is proposal-only and has no execution authority',()=>{const {proposal}=bindingFor();assert.equal(proposal.authority,'PROPOSAL_ONLY');for(const f of ['workerId','execute','dispatch','credentialId','authorization','approvalGranted'])assert.equal(f in proposal,false);});
-test('delegation core exposes no authorization grant function',()=>{assert.equal('authorizeDelegation' in (await import('../src/index.js')),false);});
+test('delegation core exposes no authorization grant API',()=>{assert.equal('authorizeDelegation' in core,false);assert.equal('createAuthorizedWorker' in core,false);});
 test('control-plane worker binding must identify an existing worker',()=>{const {proposal,binding}=bindingFor();assert.throws(()=>buildDelegationJobInput(proposal,{...binding,workerId:''}),/worker identity/);});
 test('high-risk delegation remains an approval requirement, not an approval grant',()=>{const t=task({risk:'HIGH'});const {proposal,binding}=bindingFor(t);assert.equal(proposal.approvalRequired,true);assert.throws(()=>buildDelegationJobInput(proposal,{...binding,risk:'LOW'}),/risk cannot be downgraded/);});
 test('critical risk remains represented as critical and cannot be downgraded',()=>{const t=task({risk:'CRITICAL'});const {proposal,binding}=bindingFor(t);assert.equal(proposal.risk,'CRITICAL');assert.throws(()=>buildDelegationJobInput(proposal,{...binding,risk:'HIGH'}),/risk cannot be downgraded/);});
