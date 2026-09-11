@@ -251,7 +251,7 @@ export class GovernedDelegationExecutor<TOutput = unknown> {
     if (worker.status !== 'AUTHORIZED' && worker.status !== 'RETRYING') throw new Error(`Worker is not executable from status ${worker.status}`);
     const existing = this.idempotency.get(proposal.idempotencyKey);
     if (existing) return existing;
-    let current = { ...worker, status: 'RUNNING' as const };
+    let current: AuthorizedWorker = { ...worker, status: 'RUNNING' };
     let lastResult: WorkerResult<TOutput> | undefined;
     let attempts = 0;
     while (attempts < this.policy.maxAttempts) {
