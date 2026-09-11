@@ -20,12 +20,29 @@ export interface DurableExecutiveDecision {
 }
 
 const RESOURCE_TYPE = 'ExecutiveContinuation';
+const DISPOSITIONS = new Set(['COMPLETE', 'CONTINUE', 'REWORK', 'CLARIFY', 'ESCALATE']);
+
+function validateDecision(decision: unknown): asserts decision is ExecutiveContinuationDecision {
+  if (!decision || typeof decision !== 'object') throw new Error('Executive continuation decision is required.');
+  const value = decision as Record<string, unknown>;
+  const requiredStrings = ['continuationId', 'organizationId', 'ownerUserId', 'objectiveId', 'jobId', 'rationale'];
+  if (!requiredStrings.every((key) => typeof value[key] === 'string' && (value[key] as string).length > 0)) throw new Error('Executive continuation identity and rationale are required.');
+  if (value.authority !== 'PROPOSAL_ONLY') throw new Error('Only proposal-only executive decisions may be persisted.');
+  if (typeof value.disposition !== 'string' || !DISPOSITIONS.has(value.disposition)) throw new Error('Executive continuation decision has an invalid disposition.');
+  if (!Array.isArray(value.risks) || !value.risks.every((risk) => typeof risk === 'string')) throw new Error('Executive continuation risks must be strings.');
+  if (!value.provenance || typeof value.provenance !== 'object') throw new Error('Executive continuation provenance is required.');
+  const provenance = value.provenance as Record<string, unknown>;
+  if (provenance.continuationVersion !== 'deterministic-v1' || typeof provenance.sourceEvaluationId !== 'string' || provenance.sourceEvaluationId.length === 0 || typeof provenance.sourceJobId !== 'string' || provenance.sourceJobId.length === 0 || (provenance.correlationId !== undefined && typeof provenance.correlationId !== 'string')) throw new Error('Executive continuation provenance is invalid.');
+  if (value.nextProposal !== undefined && (!value.nextProposal || typeof value.nextProposal !== 'object')) throw new Error('Executive continuation next proposal is invalid.');
+}
 
 function toDecision(metadata: unknown, createdAt: Date): DurableExecutiveDecision | null {
   if (!metadata || typeof metadata !== 'object') return null;
   const value = metadata as Record<string, unknown>;
   if (value.schemaVersion !== 1 || typeof value.continuationId !== 'string' || typeof value.organizationId !== 'string' || typeof value.ownerUserId !== 'string' || typeof value.objectiveId !== 'string' || typeof value.jobId !== 'string' || typeof value.disposition !== 'string' || typeof value.rationale !== 'string') return null;
-  if (value.authority !== 'PROPOSAL_ONLY' || !Array.isArray(value.risks) || !value.provenance || typeof value.provenance !== 'object') return null;
+  if (value.authority !== 'PROPOSAL_ONLY' || !Array.isArray(value.risks) || !value.risks.every((risk) => typeof risk === 'string') || !value.provenance || typeof value.provenance !== 'object' || !DISPOSITIONS.has(value.disposition)) return null;
+  const provenance = value.provenance as Record<string, unknown>;
+  if (provenance.continuationVersion !== 'deterministic-v1' || typeof provenance.sourceEvaluationId !== 'string' || typeof provenance.sourceJobId !== 'string') return null;
   return {
     continuationId: value.continuationId,
     organizationId: value.organizationId,
@@ -36,7 +53,7 @@ function toDecision(metadata: unknown, createdAt: Date): DurableExecutiveDecisio
     jobId: value.jobId,
     disposition: value.disposition as ExecutiveContinuationDecision['disposition'],
     rationale: value.rationale,
-    risks: value.risks.filter((risk): risk is string => typeof risk === 'string'),
+    risks: value.risks as string[],
     authority: 'PROPOSAL_ONLY',
     provenance: value.provenance as ExecutiveContinuationDecision['provenance'],
     ...(value.nextProposal && typeof value.nextProposal === 'object' ? { nextProposal: value.nextProposal as ExecutiveContinuationDecision['nextProposal'] } : {}),
@@ -44,9 +61,9 @@ function toDecision(metadata: unknown, createdAt: Date): DurableExecutiveDecisio
   };
 }
 
-/** Durable executive history uses the existing append-only audit authority. */
+/** Durable executive history uses the existing append-only AuditEvent authority. */
 export async function recordExecutiveContinuation(db: PrismaClient, decision: ExecutiveContinuationDecision): Promise<DurableExecutiveDecision> {
-  if (decision.authority !== 'PROPOSAL_ONLY') throw new Error('Only proposal-only executive decisions may be persisted.');
+  validateDecision(decision);
   const existing = await getExecutiveContinuation(db, decision.organizationId, decision.continuationId);
   if (existing) return existing;
 
