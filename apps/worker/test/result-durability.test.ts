@@ -34,9 +34,7 @@ async function setup(handlerId:string,parameters:Record<string,unknown>={},maxAt
   return {organization,worker,objective,task,workflow,job};
 }
 
-function options():WorkerRuntimeOptions{
-  return {authorizeExecution:async()=>({decision:'ALLOW' as const})};
-}
+function options():WorkerRuntimeOptions{return {authorizeExecution:async()=>({decision:'ALLOW' as const})};}
 
 test('durable result: successful validated handler output is persisted on the real runtime path',async(t)=>{
   if(!process.env.DATABASE_URL){t.skip('DATABASE_URL is required');return;}
@@ -101,7 +99,6 @@ test('durable result: duplicate and concurrent terminal completion cannot create
   const x=await setup('internal.noop');
   try{
     const jobs=new JobRepository(db);
-    const now=new Date(Date.now()+60000);
     const claimed=await jobs.claim(x.organization.id,x.job.id,x.worker.worker.id,120000,undefined,new Date());
     assert.equal(claimed.kind,'claimed');
     const started=await jobs.transition(x.organization.id,x.job.id,'CLAIMED','RUNNING',x.worker.worker.id,{organizationId:x.organization.id,actorType:'SYSTEM',eventType:'job.started',action:'start',result:'SUCCESS'},new Date());
@@ -119,7 +116,21 @@ test('durable result: duplicate and concurrent terminal completion cannot create
     const duplicate=await service.succeedWithResult(x.organization.id,x.job.id,x.worker.worker.id,result,'internal.noop');
     assert.equal(duplicate.kind,'conflict');
     assert.equal(await db.executionResult.count({where:{jobId:x.job.id}}),1);
-    void now;
+  }finally{await cleanup(x.organization.id)}
+});
+
+test('durable result: duplicate result failure rolls back the terminal Job transition',async(t)=>{
+  if(!process.env.DATABASE_URL){t.skip('DATABASE_URL is required');return;}
+  const x=await setup('internal.noop');
+  try{
+    const jobs=new JobRepository(db);
+    assert.equal((await jobs.claim(x.organization.id,x.job.id,x.worker.worker.id,120000,undefined,new Date())).kind,'claimed');
+    assert.equal((await jobs.transition(x.organization.id,x.job.id,'CLAIMED','RUNNING',x.worker.worker.id,{organizationId:x.organization.id,actorType:'SYSTEM',eventType:'job.started',action:'start',result:'SUCCESS'},new Date())).kind,'updated');
+    await db.executionResult.create({data:{jobId:x.job.id,status:'SUCCEEDED',output:{preexisting:true},handlerId:'internal.noop',validatedAt:new Date()}});
+    const result=await new JobService(db).succeedWithResult(x.organization.id,x.job.id,x.worker.worker.id,{status:'SUCCEEDED',output:{executed:true}},'internal.noop');
+    assert.equal(result.kind,'conflict');
+    assert.equal((await db.job.findUnique({where:{id:x.job.id}}))?.status,'RUNNING');
+    assert.deepEqual((await db.executionResult.findUnique({where:{jobId:x.job.id}}))?.output,{preexisting:true});
   }finally{await cleanup(x.organization.id)}
 });
 
@@ -131,6 +142,6 @@ test('durable result: organization-scoped Job access does not cross tenant bound
     const result=await db.executionResult.create({data:{jobId:x.job.id,status:'SUCCEEDED',output:{executed:true},handlerId:'internal.noop',validatedAt:new Date()}});
     assert.equal(result.jobId,x.job.id);
     assert.equal(await new JobRepository(db).get(other.id,x.job.id),null);
-    assert.equal((await db.job.findFirst({where:{organizationId:other.id,id:x.job.id}})),null);
+    assert.equal(await db.job.findFirst({where:{organizationId:other.id,id:x.job.id}}),null);
   }finally{await cleanup(x.organization.id);await db.organization.delete({where:{id:other.id}})}
 });
