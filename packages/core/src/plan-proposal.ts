@@ -37,12 +37,7 @@ export interface PlanProposal {
 
 export interface DeterministicPlanner { propose(intent: OwnerIntent): PlanProposal; }
 
-/**
- * Conservative deterministic intent-to-capability mapping. This is requirement
- * inference only: it never grants authority or selects a worker/provider.
- * Unrecognized language intentionally returns [] so the governed model/CEO path
- * can handle ambiguity rather than guessing an execution capability.
- */
+/** Requirement inference only. It never grants authority, selects a worker, or selects a provider. */
 export function inferWorkforceCapabilities(intent: OwnerIntent): readonly string[] {
   const text = [
     intent.requestedOutcome,
@@ -63,7 +58,16 @@ export function inferWorkforceCapabilities(intent: OwnerIntent): readonly string
     [/\b(research|investigate|literature|paper|sources|find information)\b/, ['WEB_RESEARCH','SOURCE_DISCOVERY']],
     [/\b(market research|market analysis|competitor)\b/, ['WEB_RESEARCH','MARKET_ANALYSIS','PRODUCT_ANALYSIS']],
     [/\b(data analysis|analyze data|dataset|spreadsheet|analytics|metrics)\b/, ['DATA_ANALYSIS']],
-    [/\b(security audit|security review|vulnerability|penetration|threat model)\b/, ['SECURITY_REVIEW']],
+    [/\b(finance|financial|budget|forecast|revenue|expense|cash flow|accounting)\b/, ['DATA_ANALYSIS','MARKET_ANALYSIS']],
+    [/\b(sales|lead generation|pipeline|prospect|outreach)\b/, ['GROWTH_ANALYSIS','COPYWRITING']],
+    [/\b(customer support|support tickets|help desk|customer success)\b/, ['COPYWRITING','CONTENT_QA']],
+    [/\b(ecommerce|e-commerce|online store|shopify|product catalog|checkout)\b/, ['SOFTWARE_ENGINEERING','FRONTEND_DEVELOPMENT','GROWTH_ANALYSIS']],
+    [/\b(devops|ci\/cd|deployment|deploy|infrastructure|docker|kubernetes)\b/, ['SOFTWARE_ENGINEERING','SECURITY_REVIEW','TECHNICAL_QA']],
+    [/\b(cloud|aws|azure|gcp|cloud architecture)\b/, ['SOFTWARE_ENGINEERING','ARCHITECTURE','SECURITY_REVIEW']],
+    [/\b(ai|artificial intelligence|machine learning|automation|workflow automation)\b/, ['SOFTWARE_ENGINEERING','ARCHITECTURE']],
+    [/\b(product management|roadmap|requirements|prd|product strategy)\b/, ['PRODUCT_ANALYSIS','STRATEGIC_REASONING']],
+    [/\b(project management|project plan|milestone|sprint|operations|operating process)\b/, ['STRATEGIC_REASONING','TECHNICAL_QA']],
+    [/\b(security audit|security review|vulnerability|penetration|threat model|privacy)\b/, ['SECURITY_REVIEW']],
     [/\b(write|writing|blog|article|copy|content|newsletter)\b/, ['COPYWRITING']],
     [/\b(seo|search engine optimization|keyword research)\b/, ['SEO','COPYWRITING']],
     [/\b(social media|instagram|facebook|linkedin|twitter|social campaign)\b/, ['SOCIAL_MEDIA','COPYWRITING','GROWTH_ANALYSIS']],
@@ -71,6 +75,8 @@ export function inferWorkforceCapabilities(intent: OwnerIntent): readonly string
     [/\b(video|reel|shorts|editing|edit a video)\b/, ['VIDEO_EDITING']],
     [/\b(audio|voice|podcast|sound)\b/, ['AUDIO_GENERATION']],
     [/\b(presentation|slides|pitch deck|powerpoint)\b/, ['PRESENTATION_DESIGN']],
+    [/\b(ux|user experience|wireframe|prototype)\b/, ['UX_DESIGN']],
+    [/\b(visual design|graphic design|branding|logo)\b/, ['VISUAL_DESIGN']],
     [/\b(qa|quality assurance|test|testing|validate)\b/, ['TECHNICAL_QA']],
     [/\b(content qa|proofread|fact check)\b/, ['CONTENT_QA']],
   ];
@@ -87,8 +93,8 @@ export class DeterministicPlanGenerator implements DeterministicPlanner {
   propose(intent: OwnerIntent): PlanProposal {
     const taskId = `${intent.intentId}:task:1`;
     const capabilities = inferWorkforceCapabilities(intent);
-    const approvalRequired = intent.riskRequirements.length > 0 || intent.priority === 'CRITICAL';
-    const risk: ExecutionRisk = intent.priority === 'CRITICAL' ? 'CRITICAL' : intent.priority === 'HIGH' ? 'HIGH' : 'LOW';
+    const approvalRequired = intent.riskRequirements.length > 0 || intent.priority === 'HIGH' || intent.priority === 'CRITICAL';
+    const risk: ExecutionRisk = intent.priority === 'CRITICAL' ? 'CRITICAL' : intent.priority === 'HIGH' ? 'HIGH' : intent.priority === 'MEDIUM' ? 'MEDIUM' : 'LOW';
     const permissions: readonly Permission[] = ['objective:read', 'task:read'];
 
     return {
@@ -107,7 +113,7 @@ export class DeterministicPlanGenerator implements DeterministicPlanner {
         risk,
         approvalRequired,
         ...(intent.requestedBudget !== undefined ? { estimatedCost: intent.requestedBudget } : {}),
-        proposedWorkerRole: capabilities.includes('FRONTEND_DEVELOPMENT') ? 'frontend-engineer' : capabilities.includes('BACKEND_DEVELOPMENT') ? 'backend-engineer' : capabilities.includes('SOFTWARE_ENGINEERING') ? 'software-engineer' : 'general',
+        proposedWorkerRole: capabilities.includes('FRONTEND_DEVELOPMENT') ? 'frontend-engineer' : capabilities.includes('BACKEND_DEVELOPMENT') ? 'backend-engineer' : capabilities.includes('SECURITY_REVIEW') ? 'security-reviewer' : capabilities.includes('DATA_ANALYSIS') ? 'data-analyst' : capabilities.includes('COPYWRITING') ? 'content-specialist' : capabilities.includes('SOFTWARE_ENGINEERING') ? 'software-engineer' : 'general',
         targetOrganizationId: intent.organizationId,
       }],
       requiredCapabilities: capabilities,
@@ -116,8 +122,8 @@ export class DeterministicPlanGenerator implements DeterministicPlanner {
       approvalRequired,
       ...(intent.requestedBudget !== undefined ? { estimatedCost: intent.requestedBudget } : {}),
       rationale: 'Deterministic planner infers bounded workforce requirements from owner intent; authority remains proposal-only.',
-      decisionMetadata: { planner: 'deterministic-v2', sourceCorrelationId: intent.correlationId, capabilityInference: 'deterministic-keyword-contracts' },
-      proposalVersion: 2,
+      decisionMetadata: { planner: 'deterministic-v3', sourceCorrelationId: intent.correlationId, capabilityInference: 'deterministic-capability-contracts' },
+      proposalVersion: 3,
       createdAt: new Date().toISOString(),
       authority: 'PROPOSAL_ONLY',
     };
