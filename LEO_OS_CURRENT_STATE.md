@@ -1,93 +1,62 @@
 # LEO OS — CURRENT STATE
 
 **Product:** LEO OS — Leadership & Execution Operating System  
-**Audit date:** 2026-09-10  
+**Audit date:** 2026-09-12  
 **Repository:** `haeshitsa/firsy`  
 **Branch:** `main`  
-**Version target:** V1.09 final Phase-1 certification
+**Version target:** Phase 2 complete; Phase 3 planned, not implemented
 
 ## INTERNAL / PRIVATE STATUS
-LEO OS is a private internal operating system intended to run company workflows on a local/private environment. It is not a public SaaS product. No public deployment or external integration work is in scope.
+LEO OS is a private internal operating system intended to run company workflows on a local/private environment. External integrations and autonomous external actions are not yet enabled.
 
 ## PHASE 1 STATUS
-V1.01 through V1.09 control-plane milestones are implemented. **Phase 1 — RUNTIME CERTIFIED WITH DOCUMENTED LIMITATIONS.**
+V1.01 through V1.09 control-plane milestones are implemented and certified. **Phase 1 — RUNTIME CERTIFIED WITH DOCUMENTED LIMITATIONS.**
 
-## FINAL TWO-RUN CERTIFICATION
-The final certification reference is GitHub Actions **run #141**, run ID `34486653370`, certified code commit `e0365cc89af539fefc37681522b4bd756692bb58`.
+## PHASE 2 STATUS
+**PHASE 2 — VERIFIED/CERTIFIED AND MERGED.**
 
-The job executed, in order:
-1. **Run 1:** `pnpm verify:v107-v108-final` for V1.07/V1.08 historical regression.
-2. **Database reset:** `pnpm db:reset:migrate`.
-3. **Run 2:** `pnpm verify:v109` for complete V1.01→V1.09 Phase-1 regression.
+Phase 2 adds governed intelligence and operating-loop boundaries around the frozen Phase 1 control plane. The 17-slice phase ends at Slice 17, the integrated operating contract and certification gate.
 
-All three workflow steps completed successfully.
+Certified completion head before merge: `f3f6abccfe5486cc80f2982110fbc6ff1722cd28`.
+Certification: GitHub Actions **run #293**, run ID `34644907941`, terminal **SUCCESS**.
+Phase 2 completion merge: `6a45e7ec111d0f18a3ca7bf31bc68c8f0f7cc092`.
 
-## VERIFIED CONTROL-PLANE AREAS
-- PostgreSQL 16 clean-database migration and schema validation.
-- Prisma generation and validation.
-- TypeScript typecheck, lint and workspace build.
-- Core workflow/job/task graph invariants.
-- Authentication/session and RBAC boundaries.
-- Organization-scoped repositories and durable mutations.
-- Worker credentials, suspension/revocation and capability enforcement.
-- Durable Job lifecycle, retry timing, exhaustion and terminal protection.
-- Workflow bootstrap, deterministic task selection and terminal reconciliation.
-- Approval binding, lifecycle, single-use and restart-safe reconciliation.
-- Checkpoint versioning, ownership, resumable state and secret redaction.
-- PostgreSQL concurrency behavior and deterministic conflict handling.
-- Execution Gateway risk policy for LOW/MEDIUM/HIGH/CRITICAL.
-- Controlled Handler Registry and result validation.
-- Full Orchestrator→Dispatcher→Worker Runtime→Gateway→Handler→Validation→Workflow completion path.
-- Real worker-process interruption and stale-lease recovery with new-process reclamation.
-- Recursive audit secret redaction.
+## PHASE 2 — 17 SLICES
+1. Intent → Plan Proposal
+2. Provider-neutral Model Abstraction
+3. CEO Reasoning / Decision Intelligence
+4. Governed Memory & Company Knowledge
+5. Model Runtime & Routing Boundary
+6. LEO Executive Identity & CEO Operating Loop
+7. Governed AI Workforce, Capability & Provider Registry
+8. Governed Delegation & Workforce Execution
+9. Governed Outcome Evaluation & QA Decision Boundary
+10. Governed Executive Continuation & Objective Feedback Loop
+11. Durable Executive Decision State & Audit Boundary
+12. Governed Workforce Lifecycle & Staffing Decision Boundary
+13. Governed Operating Event Orchestration
+14. Governed External Action Proposal Boundary
+15. Governed Proactive Intelligence Boundary
+16. Governed Financial Spend Proposal Boundary
+17. Phase 2 Integrated Operating Contract & Certification Gate
 
-## FINAL TEST EVIDENCE
-Each certification gate passed:
-- Core: 16/16.
-- DB: 33/33.
-- API: 9/9.
-- Worker: 5/5.
-- DB integration: 21/21.
-- PostgreSQL smoke: passed.
-- Typecheck: passed.
-- Lint: passed.
+## PHASE 2 FINAL OPERATING CHAIN
+OWNER INTENT → LEO EXECUTIVE → PLAN/CAPABILITY REQUIREMENTS → WORKFORCE/PROVIDER ELIGIBILITY → DELEGATION → EXISTING DURABLE JOB/DISPATCH/WORKER RUNTIME/EXECUTION GATEWAY → VALIDATED RESULT → OUTCOME EVALUATION → EXECUTIVE CONTINUATION → DURABLE EXECUTIVE HISTORY → GOVERNED OPERATING EVENT → EXTERNAL ACTION / PROACTIVE WORK / SPEND PROPOSAL → EXISTING CONTROL PLANE.
 
-Run 2 additionally passed workspace build.
+Phase 2 introduces no second executor, no second control plane, and no new source of truth for execution authority. Proposal-only boundaries cannot grant approval, permissions, capabilities, worker identity, credentials, spending authority, or external-action authority.
 
-Across both gates: **168 test invocations, all passed**. The DB integration suite overlaps DB unit coverage and is not a unique-test count.
+## STRESS EVIDENCE
+The completion branch certified a deterministic **20,480-case** matrix: 32 company domains × 8 task forms × 8 contexts × 10 semantic variants. It covered capability inference, proposal validation, organization binding, risk/approval semantics, unknown/ambiguous behavior, and authority non-leakage.
 
-## CONCURRENCY STRENGTHENING
-Four high-value PostgreSQL race scenarios were repeated 10 iterations each:
-- worker claim;
-- workflow bootstrap/idempotency;
-- approval decision;
-- approval consumption.
+## SLICE 8 REGRESSION RESOLUTION
+The final Phase 2 certification included the repaired Slice 8 durable delegation path. The production bridge reaches the existing Phase 1 durable Job → Dispatcher → Worker Runtime → Execution Gateway → Handler → Result Validation path. Run #293 passed both the historical V1.07/V1.08 gate and the complete V1.01→V1.09 regression gate.
 
-All 40 repeated iterations passed. Additional one-shot races for claim, completion, cancellation, approval and bootstrap also passed.
+## PHASE 2 FREEZE
+Phase 2 is now frozen. Do not add more Phase 2 slices, reopen certified Slice 8, or replace Phase 1 execution primitives unless a new architectural decision explicitly authorizes it.
 
-## DOCUMENTED LIMITATIONS
-- Exhaustive route-by-route API status permutation testing is not independently certified.
-- Exhaustive individual HTTP cross-organization permutations are not independently enumerated; repository/service and worker boundaries are verified.
-- Process interruption is real process-level testing, but does not kill a process at every possible instruction boundary of every handler.
-- Exhaustive combinatorial/fuzz testing of every graph/request input is not claimed.
-- CI PostgreSQL uses trust authentication because it is a disposable isolated test service; this is not a production credential configuration.
+## PHASE 3 STATUS
+**PLANNED ONLY — NOT IMPLEMENTED.**
 
-These are breadth/exhaustiveness limitations, not known critical defects.
+Phase 3 will focus on turning the governed operating system into a controlled real-world company execution platform through explicit adapters, credentials, external tools, creator workflows, observability, and bounded autonomous operation. Phase 3 must preserve all Phase 1 and Phase 2 invariants and must never bypass the control plane.
 
-## CURRENT TRUTHFUL STATUS
-**B. PHASE 1 RUNTIME CERTIFIED WITH DOCUMENTED LIMITATIONS.**
-
-No known critical control-plane invariant remained broken in the completed two-run certification path.
-
-See:
-- `docs/V1.07_V1.08_FINAL_REGRESSION.md`
-- `docs/PHASE_1_FINAL_CERTIFICATION.md`
-
-## PHASE BOUNDARY
-No AI agents, LLM/model providers, MCP, GitHub integration, Gmail/Google Workspace, Instagram/Meta, Google Drive, Google Calendar, n8n, browser/computer use, external APIs, external messaging, autonomous external actions, external deployment, or Founder Command Center UI were introduced.
-
-## NAMING / COMPATIBILITY NOTES
-Product identity is `LEO OS`. Existing `@founder-os/*` namespaces, historical migration/database identifiers and `founder_os_session` remain compatibility identifiers and are intentionally preserved.
-
-## NEXT STEP
-**Freeze Phase 1.** No V1.10 or Phase 2 work is started by this certification. Any future phase must be separately authorized after this final Phase-1 gate.
+See `docs/LEO_OS_PHASE_3_PLAN.md`.
