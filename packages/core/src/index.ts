@@ -23,4 +23,27 @@ export * from './model-runtime.js';
 export * from './leo-executive.js';
 export * from './workforce.js';
 export * from './delegation.js';
-export * from './outcome-evaluation.js';
+export {
+  OUTCOME_EVALUATOR_VERSION,
+  OUTCOME_EVALUATION_AUTHORITY,
+  OUTCOMES,
+  CRITERION_STATES,
+  SUPPORTED_OUTCOME_CRITERION,
+  evaluateOutcome,
+  isOutcomeEvaluationFailure,
+} from './outcome-evaluation.js';
+export {
+  QA_DECISIONS as OUTCOME_QA_DECISIONS,
+} from './outcome-evaluation.js';
+export type {
+  Outcome,
+  CriterionState,
+  SupportedOutcomeCriterion,
+  AuthoritativeExecutionResult,
+  OutcomeEvaluationContext,
+  CriterionEvaluation,
+  EvaluatorProvenance,
+  OutcomeEvaluation,
+  OutcomeEvaluationFailure,
+  QADecision as OutcomeQADecision,
+} from './outcome-evaluation.js';
