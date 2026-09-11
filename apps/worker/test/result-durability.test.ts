@@ -130,7 +130,7 @@ test('durable result: duplicate result failure rolls back the terminal Job trans
     const result=await new JobService(db).succeedWithResult(x.organization.id,x.job.id,x.worker.worker.id,{status:'SUCCEEDED',output:{executed:true}},'internal.noop');
     assert.equal(result.kind,'conflict');
     assert.equal((await db.job.findUnique({where:{id:x.job.id}}))?.status,'RUNNING');
-    assert.deepEqual((await db.executionResult.findUnique({where:{jobId:x.job.id}})?.output),{preexisting:true});
+    assert.deepEqual((await db.executionResult.findUnique({where:{jobId:x.job.id}}))?.output,{preexisting:true});
   }finally{await cleanup(x.organization.id)}
 });
 
