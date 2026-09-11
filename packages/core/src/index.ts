@@ -45,3 +45,5 @@ export type {
   QADecision as OutcomeQADecision,
 } from './outcome-evaluation.js';
 export * from './executive-continuation.js';
+export * from './workforce-lifecycle.js';
+export * from './operating-event.js';
