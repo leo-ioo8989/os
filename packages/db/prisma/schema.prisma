@@ -95,6 +95,11 @@ enum JobStatus {
   CANCELLED
 }
 
+enum ExecutionResultStatus {
+  SUCCEEDED
+  FAILED
+}
+
 enum WorkerStatus {
   ACTIVE
   SUSPENDED
@@ -266,7 +271,7 @@ model Approval {
   organization       Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   job                Job?           @relation(fields: [jobId], references: [id], onDelete: SetNull)
   requester          User?          @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: SetNull)
-  decider            User?          @relation("ApprovalDecider", fields: [decidedBy], references: [id], onDelete: SetNull)
+  decider            User?           @relation("ApprovalDecider", fields: [decidedBy], references: [id], onDelete: SetNull)
 
   @@index([organizationId, status, createdAt])
   @@index([organizationId, targetResourceType, targetResourceId])
@@ -366,6 +371,7 @@ model Job {
   workerIdentity    Worker?    @relation(fields: [workerIdentityId], references: [id], onDelete: SetNull)
   checkpoints       Checkpoint[]
   approvals         Approval[]
+  executionResult   ExecutionResult?
 
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, status, priority, createdAt])
@@ -375,6 +381,18 @@ model Job {
   @@index([objectiveId, status])
   @@index([taskId, status])
   @@index([workflowId, status])
+}
+
+model ExecutionResult {
+  id          String               @id @default(cuid())
+  jobId       String               @unique
+  status      ExecutionResultStatus
+  output      Json?
+  failure     Json?
+  handlerId   String
+  validatedAt DateTime
+  createdAt   DateTime             @default(now())
+  job         Job                  @relation(fields: [jobId], references: [id], onDelete: Cascade)
 }
 
 model Checkpoint {
