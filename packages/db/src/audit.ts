@@ -8,6 +8,7 @@ export const AUDIT_EVENTS = {
  WORKER_CREATED:'worker.created', WORKER_AUTHENTICATED:'worker.authenticated', WORKER_AUTHENTICATION_FAILED:'worker.authentication_failed', WORKER_SUSPENDED:'worker.suspended', WORKER_REVOKED:'worker.revoked', WORKER_CREDENTIAL_ROTATED:'worker.credential_rotated', WORKER_STATUS_CHANGED:'worker.status_changed',
  EXECUTION_REQUESTED:'execution.requested', EXECUTION_ALLOWED:'execution.allowed', EXECUTION_DENIED:'execution.denied', EXECUTION_APPROVAL_REQUIRED:'execution.approval_required', EXECUTION_APPROVED:'execution.approved', EXECUTION_REJECTED:'execution.rejected', EXECUTION_CANCELLED:'execution.cancelled',
  WORKFLOW_JOB_LINKED:'workflow.job_linked', WORKFLOW_JOB_RESUMED:'workflow.job_resumed', WORKFLOW_APPROVAL_BLOCKED:'workflow.approval_blocked',
+ EXECUTIVE_CONTINUATION_PROPOSED:'executive.continuation_proposed', EXECUTIVE_CONTINUATION_RECORDED:'executive.continuation_recorded',
 } as const;
 export type AuditEventType=(typeof AUDIT_EVENTS)[keyof typeof AUDIT_EVENTS];
 const SENSITIVE_KEY=/(?:password|passphrase|token|secret|api[_-]?key|credential|authorization|cookie|private[_-]?key|access[_-]?key|refresh[_-]?token)/i;
