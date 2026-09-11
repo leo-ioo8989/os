@@ -44,3 +44,4 @@ export type {
   OutcomeEvaluationFailure,
   QADecision as OutcomeQADecision,
 } from './outcome-evaluation.js';
+export * from './executive-continuation.js';
