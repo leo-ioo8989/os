@@ -157,6 +157,12 @@ test.after(async () => {
 
 const gateway = (request: Parameters<typeof authorizeExecution>[1]) => authorizeExecution(db, request);
 
+// The task is governed by SOFTWARE_ENGINEERING, while the concrete Phase 1
+// handler requires its own internal.calculate execution capability. The
+// fixture must represent both facts so the real Execution Gateway can perform
+// its authoritative capability check without being weakened.
+const executionCapabilities = ['SOFTWARE_ENGINEERING', 'internal.calculate'];
+
 test('Slice 8 delegation reaches the durable Phase 1 path through the production control-plane bridge', async (t) => {
   if (!process.env.DATABASE_URL) {
     t.skip('DATABASE_URL is required');
@@ -169,7 +175,7 @@ test('Slice 8 delegation reaches the durable Phase 1 path through the production
       organizationId: organization.id,
       name: 'delegation-worker',
       type: 'test',
-      capabilities: ['SOFTWARE_ENGINEERING', 'internal.calculate'],
+      capabilities: executionCapabilities,
       credential: 'v208-delegation-worker-credential-123456',
     }, audit('worker_created', organization.id));
     const objective = await db.objective.create({
@@ -219,7 +225,7 @@ test('Slice 8 delegation reaches the durable Phase 1 path through the production
       taskId: task.id,
       delegationId: proposal.proposalId,
       roleId: 'engineer',
-      capabilities: ['SOFTWARE_ENGINEERING'],
+      capabilities: executionCapabilities,
       context: scope,
       providerId: 'provider-test',
       modelId: 'model-test',
@@ -255,7 +261,7 @@ test('duplicate Slice 8 delegation reuses durable Job idempotency', async (t) =>
       organizationId: organization.id,
       name: 'delegation-worker',
       type: 'test',
-      capabilities: ['SOFTWARE_ENGINEERING', 'internal.calculate'],
+      capabilities: executionCapabilities,
       credential: 'v208-duplicate-worker-credential-123456',
     }, audit('worker_created', organization.id));
     const objective = await db.objective.create({
@@ -294,7 +300,7 @@ test('duplicate Slice 8 delegation reuses durable Job idempotency', async (t) =>
       taskId: task.id,
       delegationId: proposal.proposalId,
       roleId: 'engineer',
-      capabilities: ['SOFTWARE_ENGINEERING'],
+      capabilities: executionCapabilities,
       context: scope,
       providerId: 'provider-test',
       modelId: 'model-test',
