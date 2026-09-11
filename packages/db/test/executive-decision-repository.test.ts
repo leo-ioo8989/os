@@ -58,3 +58,12 @@ test('rejects any non proposal-only decision', async () => {
   await assert.rejects(() => recordExecutiveContinuation(db, { ...decision, authority: 'EXECUTE' as any }), /proposal-only/);
   assert.equal(events.length, 0);
 });
+
+test('rejects malformed decisions before durable write', async () => {
+  const events: any[] = [];
+  const db = fakeDb(events);
+  await assert.rejects(() => recordExecutiveContinuation(db, { ...decision, rationale: undefined as any }), /identity and rationale/);
+  await assert.rejects(() => recordExecutiveContinuation(db, { ...decision, risks: ['ok', 42] as any }), /risks must be strings/);
+  await assert.rejects(() => recordExecutiveContinuation(db, { ...decision, disposition: 'UNKNOWN' as any }), /invalid disposition/);
+  assert.equal(events.length, 0);
+});
