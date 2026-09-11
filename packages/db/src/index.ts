@@ -12,3 +12,6 @@ export * from './worker-repository.js';
 export * from './workflow-job-repository.js';
 export * from './workflow-execution-repository.js';
 export * from './workflow-runtime-repository.js';
+export * from './executive-decision-repository.js';
+export * from './workforce-lifecycle-repository.js';
+export * from './operating-event-repository.js';
