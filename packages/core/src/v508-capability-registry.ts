@@ -1,3 +1,8 @@
-export const V508_VERSION='5.08';
-export interface Capability{key:string;version:string;sideEffect:'NONE'|'READ'|'WRITE';requiredScope:string;enabled:boolean;}
-export class CapabilityRegistry{private readonly entries=new Map<string,Capability>();register(c:Capability){if(!c.key||!c.version||!c.requiredScope)throw new Error('invalid capability');if(this.entries.has(c.key))throw new Error('duplicate capability');this.entries.set(c.key,structuredClone(c));}resolve(key:string,scope:string):Capability{const c=this.entries.get(key);if(!c||!c.enabled||c.requiredScope!==scope)throw new Error('capability denied');return structuredClone(c);}list():Capability[]{return [...this.entries.values()].map(structuredClone);}}
+export const V508_VERSION = '5.08';
+export interface Capability { key: string; version: string; sideEffect: 'NONE' | 'READ' | 'WRITE'; requiredScope: string; enabled: boolean; }
+export class CapabilityRegistry {
+  private readonly entries = new Map<string, Capability>();
+  register(c: Capability) { if (!c.key || !c.version || !c.requiredScope) throw new Error('invalid capability'); if (this.entries.has(c.key)) throw new Error('duplicate capability'); this.entries.set(c.key, structuredClone(c)); }
+  resolve(key: string, scope: string): Capability { const c = this.entries.get(key); if (!c || !c.enabled || c.requiredScope !== scope) throw new Error('capability denied'); return structuredClone(c); }
+  list(): Capability[] { return [...this.entries.values()].map((value) => structuredClone(value)); }
+}
