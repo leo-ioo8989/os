@@ -38,3 +38,4 @@ export * from './browser-computer-execution.js';
 export * from './v308-resource-governance.js';
 export * from './v309-bounded-autonomy.js';
 export * from './v310-autonomous-recovery.js';
+export * from './v311-autonomous-planning.js';
