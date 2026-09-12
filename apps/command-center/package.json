@@ -2,6 +2,6 @@
   "name": "@founder-os/command-center",
   "private": true,
   "type": "module",
-  "scripts": {"dev": "tsx src/server.ts", "build": "tsc", "typecheck": "tsc --noEmit", "lint": "tsc --noEmit", "test": "tsx --test"},
+  "scripts": {"dev": "tsx src/server.ts", "build": "tsc", "start": "node dist/src/server.js", "typecheck": "tsc --noEmit", "lint": "tsc --noEmit", "test": "tsx --test"},
   "devDependencies": {"tsx": "^4.20.3", "typescript": "^5.9.2"}
 }
