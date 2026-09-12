@@ -1,0 +1,41 @@
+name: LEO OS V3.05 Certification
+on:
+  push:
+    branches: [main, v305-youtube-implementation]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: founder_os
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d founder_os"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os?schema=public
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable && corepack prepare pnpm@10.15.0 --activate
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm db:validate
+      - run: pnpm db:migrate
+      - run: pnpm db:smoke
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm --filter @founder-os/core test
+      - run: pnpm test:unit
+      - run: pnpm test:integration
+      - run: pnpm --filter @founder-os/core exec tsx --test test/youtube-creator.test.ts
