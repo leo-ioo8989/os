@@ -1,0 +1,12 @@
+import {describe,expect,it} from 'vitest';
+import {validateContextGraph,upsertContextNode} from '../src/v501-company-context.js';
+import {retrieveKnowledge} from '../src/v502-knowledge-retrieval.js';
+import {validateIntelligenceRequest} from '../src/v503-intelligence-gateway.js';
+import {decomposeGoal} from '../src/v505-goal-decomposition.js';
+import {proposeStrategicPlan} from '../src/v506-strategic-planner.js';
+import {validateAgentProposal} from '../src/v507-controlled-agent-runtime.js';
+import {CapabilityRegistry} from '../src/v508-capability-registry.js';
+import {shouldStart} from '../src/v509-autonomous-workflows.js';
+import {proposeOptimization} from '../src/v510-evaluation-optimization.js';
+import {certifyPhase5,PHASE5_VERSIONS} from '../src/v512-phase5-certification.js';
+describe('Phase 5',()=>{it('rejects cross-org graph state',()=>{const g={organizationId:'o1',nodes:[],edges:[],version:1};expect(()=>validateContextGraph({...g,nodes:[{id:'x',organizationId:'o2',type:'PROJECT',label:'x',provenance:{source:'t',timestamp:new Date().toISOString()}}]})).toThrow();});it('preserves scoped retrieval',()=>{const x=retrieveKnowledge([{id:'1',organizationId:'o1',content:'sales',classification:'PUBLIC_INTERNAL',sourceId:'s',version:1},{id:'2',organizationId:'o2',content:'sales',classification:'PUBLIC_INTERNAL',sourceId:'s',version:1}],{organizationId:'o1',actorId:'a',query:'sales',allowedClassifications:['PUBLIC_INTERNAL']});expect(x.map(i=>i.id)).toEqual(['1']);});it('requires intelligence provenance context',()=>{expect(()=>validateIntelligenceRequest({organizationId:'',actorId:'a',correlationId:'c',prompt:'x',maxTokens:1})).toThrow();});it('bounds decomposition',()=>{expect(decomposeGoal({organizationId:'o',objectiveId:'g',description:'ship product',maxDepth:1,maxTasks:2})).toHaveLength(2);});it('forces optimization approval',()=>{expect(proposeOptimization({targetId:'x',changes:{a:1},expectedImpact:1,requiresApproval:false}).requiresApproval).toBe(true);});it('denies unregistered capability',()=>{const r=new CapabilityRegistry();expect(()=>r.resolve('missing','x')).toThrow();});it('never starts disabled workflows',()=>{expect(shouldStart({workflowId:'w',organizationId:'o',trigger:'t',steps:['x'],maxConcurrent:1,requiresApproval:false,enabled:false},true)).toBe(false);});it('requires evidence for certification',()=>{const e=Object.fromEntries(PHASE5_VERSIONS.map(v=>[v,{unit:true,adversarial:true,integration:true,architecture:true,regression:true}]));expect(certifyPhase5(e).status).toBe('CERTIFIED');});});
