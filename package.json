@@ -22,7 +22,7 @@
     "db:reset:migrate": "pnpm --filter @founder-os/db exec prisma migrate reset --force",
     "db:smoke": "pnpm --filter @founder-os/db smoke",
     "verify:v107": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration",
-    "verify:v107-v108-final": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration",
+    "verify:v107-v108-final": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm test:unit && pnpm test:integration",
     "verify:v108": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm test:unit && pnpm test:integration",
     "verify:v109": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm test:unit && pnpm test:integration",
     "verify:v301": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
@@ -35,6 +35,8 @@
     "verify:v309": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "verify:v310": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "verify:v311": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
+    "verify:phase4": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
+    "verify:phase5": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration && pnpm verify:v311",
     "format": "prettier --write ."
   },
   "devDependencies": { "@types/node": "^22.15.0", "prettier": "^3.6.2", "typescript": "^5.9.2" }
