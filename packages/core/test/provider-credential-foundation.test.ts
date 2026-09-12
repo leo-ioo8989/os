@@ -1,147 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  DeterministicCredentialBroker,
-  ProviderGateway,
-  ProviderRegistry,
-  type CredentialReference,
-  type ProviderAdapter,
-  type ProviderCallContext,
-  type ProviderDefinition,
-} from '../src/provider-credential-foundation.js';
+import { DeterministicCredentialBroker, ProviderGateway, ProviderRegistry, type CredentialReference, type ProviderAdapter, type ProviderCallContext, type V3ProviderDefinition } from '../src/provider-credential-foundation.js';
 
-const provider: ProviderDefinition = {
-  providerId: 'provider.test',
-  organizationId: 'org-a',
-  displayName: 'Deterministic Test Provider',
-  supportedModels: ['model.test'],
-  supportedCapabilities: ['reasoning'],
-  status: 'AVAILABLE',
-  policyClass: 'CORE',
-  provenance: 'v3.01-test-provider',
-};
-
-const credential: CredentialReference = {
-  credentialId: 'cred-a',
-  organizationId: 'org-a',
-  providerId: 'provider.test',
-  status: 'ACTIVE',
-  scope: 'model.inference',
-  version: 1,
-};
-
-const context: ProviderCallContext = {
-  organizationId: 'org-a',
-  providerId: 'provider.test',
-  modelId: 'model.test',
-  credentialId: 'cred-a',
-  correlationId: 'corr-1',
-  authorization: 'AUTHORIZED_WORKER',
-};
-
-function adapter(): ProviderAdapter {
-  return {
-    providerId: 'provider.test',
-    generate(request, secret) {
-      assert.equal(secret.secret, 'super-secret');
-      return {
-        providerId: request.providerId,
-        modelId: request.modelId,
-        correlationId: request.correlationId,
-        status: 'SUCCESS',
-        output: { ok: true },
-        provenance: 'provider-response-v3.01',
-      };
-    },
-  };
-}
-
-function gateway(overrides: Partial<CredentialReference> = {}, providerOverrides: Partial<ProviderDefinition> = {}) {
-  const reference = { ...credential, ...overrides };
-  return new ProviderGateway(
-    new ProviderRegistry([{ ...provider, ...providerOverrides }], [adapter()]),
-    new DeterministicCredentialBroker(new Map([['cred-a', 'super-secret']])),
-    [reference],
-  );
-}
-
-test('successful provider call keeps the secret inside the credential broker boundary', () => {
-  const result = gateway().call(context, { prompt: 'hello' });
-  assert.equal(result.status, 'SUCCESS');
-  if (result.status === 'SUCCESS') assert.deepEqual(result.response.output, { ok: true });
-});
-
-test('provider organization mismatch fails closed', () => {
-  const result = gateway({}, { organizationId: 'org-b' }).call(context, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'ORG_MISMATCH');
-});
-
-test('credential organization mismatch fails closed', () => {
-  const result = gateway({ organizationId: 'org-b' }).call(context, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'CREDENTIAL_ORG_MISMATCH');
-});
-
-test('credential provider mismatch fails closed', () => {
-  const result = gateway({ providerId: 'other-provider' }).call(context, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'CREDENTIAL_PROVIDER_MISMATCH');
-});
-
-test('revoked credential cannot be used', () => {
-  const result = gateway({ status: 'REVOKED' }).call(context, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'CREDENTIAL_REVOKED');
-});
-
-test('provider disabled cannot be used', () => {
-  const result = gateway({}, { status: 'DISABLED' }).call(context, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'PROVIDER_DISABLED');
-});
-
-test('missing authorized worker context fails closed', () => {
-  const result = gateway().call({ ...context, authorization: 'NOT_AUTHORIZED' as 'AUTHORIZED_WORKER' }, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'AUTHORIZATION_REQUIRED');
-});
-
-test('unsupported model fails before credential resolution', () => {
-  const result = gateway().call({ ...context, modelId: 'model.other' }, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'MODEL_NOT_SUPPORTED');
-});
-
-test('provider response provenance is validated', () => {
-  const badAdapter: ProviderAdapter = {
-    providerId: 'provider.test',
-    generate(request) {
-      return { providerId: 'wrong', modelId: request.modelId, correlationId: request.correlationId, status: 'SUCCESS', output: {}, provenance: 'x' };
-    },
-  };
-  const gatewayWithBadAdapter = new ProviderGateway(
-    new ProviderRegistry([provider], [badAdapter]),
-    new DeterministicCredentialBroker(new Map([['cred-a', 'super-secret']])),
-    [credential],
-  );
-  const result = gatewayWithBadAdapter.call(context, {});
-  assert.equal(result.status, 'FAILURE');
-  if (result.status === 'FAILURE') assert.equal(result.failure.code, 'PROVIDER_RESPONSE_INVALID');
-});
-
-test('raw credential never appears in provider request data', () => {
-  let observed: unknown;
-  const observingAdapter: ProviderAdapter = {
-    providerId: 'provider.test',
-    generate(request, lease) {
-      observed = request;
-      assert.equal(lease.secret, 'super-secret');
-      return { providerId: request.providerId, modelId: request.modelId, correlationId: request.correlationId, status: 'SUCCESS', output: request.input, provenance: 'safe' };
-    },
-  };
-  const g = new ProviderGateway(new ProviderRegistry([provider], [observingAdapter]), new DeterministicCredentialBroker(new Map([['cred-a', 'super-secret']])), [credential]);
-  const result = g.call(context, { userInput: 'hello' });
-  assert.equal(result.status, 'SUCCESS');
-  assert.equal(JSON.stringify(observed).includes('super-secret'), false);
-});
+const provider: V3ProviderDefinition = { providerId:'provider.test', organizationId:'org-a', displayName:'Deterministic Test Provider', supportedModels:['model.test'], supportedCapabilities:['reasoning'], status:'AVAILABLE', policyClass:'CORE', provenance:'v3.01-test-provider' };
+const credential: CredentialReference = { credentialId:'cred-a', organizationId:'org-a', providerId:'provider.test', status:'ACTIVE', scope:'model.inference', version:1 };
+const context: ProviderCallContext = { organizationId:'org-a', providerId:'provider.test', modelId:'model.test', credentialId:'cred-a', correlationId:'corr-1', authorization:'AUTHORIZED_WORKER' };
+function adapter(): ProviderAdapter { return { providerId:'provider.test', generate(request, secret) { assert.equal(secret.secret,'super-secret'); return { providerId:request.providerId, modelId:request.modelId, correlationId:request.correlationId, status:'SUCCESS', output:{ok:true}, provenance:'provider-response-v3.01' }; } }; }
+function gateway(overrides: Partial<CredentialReference> = {}, providerOverrides: Partial<V3ProviderDefinition> = {}) { const reference={...credential,...overrides}; return new ProviderGateway(new ProviderRegistry([{...provider,...providerOverrides}],[adapter()]),new DeterministicCredentialBroker(new Map([['cred-a','super-secret']])),[reference]); }
+test('successful provider call keeps the secret inside the credential broker boundary',()=>{const result=gateway().call(context,{prompt:'hello'});assert.equal(result.status,'SUCCESS');if(result.status==='SUCCESS')assert.deepEqual(result.response.output,{ok:true});});
+test('provider organization mismatch fails closed',()=>{const result=gateway({}, {organizationId:'org-b'}).call(context,{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'ORG_MISMATCH');});
+test('credential organization mismatch fails closed',()=>{const result=gateway({organizationId:'org-b'}).call(context,{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'CREDENTIAL_ORG_MISMATCH');});
+test('credential provider mismatch fails closed',()=>{const result=gateway({providerId:'other-provider'}).call(context,{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'CREDENTIAL_PROVIDER_MISMATCH');});
+test('revoked credential cannot be used',()=>{const result=gateway({status:'REVOKED'}).call(context,{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'CREDENTIAL_REVOKED');});
+test('provider disabled cannot be used',()=>{const result=gateway({}, {status:'DISABLED'}).call(context,{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'PROVIDER_DISABLED');});
+test('missing authorized worker context fails closed',()=>{const result=gateway().call({...context,authorization:'NOT_AUTHORIZED' as 'AUTHORIZED_WORKER'},{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'AUTHORIZATION_REQUIRED');});
+test('unsupported model fails before credential resolution',()=>{const result=gateway().call({...context,modelId:'model.other'},{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'MODEL_NOT_SUPPORTED');});
+test('provider response provenance is validated',()=>{const badAdapter:ProviderAdapter={providerId:'provider.test',generate(request){return {providerId:'wrong',modelId:request.modelId,correlationId:request.correlationId,status:'SUCCESS',output:{},provenance:'x'};}};const gatewayWithBadAdapter=new ProviderGateway(new ProviderRegistry([provider],[badAdapter]),new DeterministicCredentialBroker(new Map([['cred-a','super-secret']])),[credential]);const result=gatewayWithBadAdapter.call(context,{});assert.equal(result.status,'FAILURE');if(result.status==='FAILURE')assert.equal(result.failure.code,'PROVIDER_RESPONSE_INVALID');});
+test('raw credential never appears in provider request data',()=>{let observed:unknown;const observingAdapter:ProviderAdapter={providerId:'provider.test',generate(request,lease){observed=request;assert.equal(lease.secret,'super-secret');return {providerId:request.providerId,modelId:request.modelId,correlationId:request.correlationId,status:'SUCCESS',output:request.input,provenance:'safe'};}};const g=new ProviderGateway(new ProviderRegistry([provider],[observingAdapter]),new DeterministicCredentialBroker(new Map([['cred-a','super-secret']])),[credential]);const result=g.call(context,{userInput:'hello'});assert.equal(result.status,'SUCCESS');assert.equal(JSON.stringify(observed).includes('super-secret'),false);});
