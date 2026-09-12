@@ -4,19 +4,29 @@ import { requireOrganization } from './auth-context.js';
 import { ApiError, errorBody } from './errors.js';
 import { readJson, routeParts, pathId, writeJson } from './http.js';
 import { addDependency, changeObjectiveStatus, changeTaskStatus, createObjective, createTask, deleteObjective, deleteTask, getObjective, getTask, listObjectives, listTasks, removeDependency, updateObjective, updateTask } from './control-plane.js';
+import { callback, integrationCatalog, listIntegrations, revokeIntegration, startOAuth, type OAuthProvider } from './integration-vault.js';
 const port = Number(process.env.PORT ?? 4000);
 const commandCenterOrigin = process.env.COMMAND_CENTER_ORIGIN ?? 'http://localhost:4173';
 const objectiveStatuses = ['DRAFT','PLANNING','READY','RUNNING','WAITING_APPROVAL','BLOCKED','PAUSED','COMPLETED','FAILED','CANCELLED'] as const;
 const taskStatuses = ['PENDING','READY','RUNNING','WAITING_APPROVAL','BLOCKED','FAILED','COMPLETED','CANCELLED'] as const;
 function bodyStatus(body: Record<string, unknown>, allowed: readonly string[]): string { if (typeof body.status !== 'string' || !allowed.includes(body.status)) throw new ApiError(422, 'VALIDATION_ERROR', 'status is invalid.'); return body.status; }
-function securityHeaders(res: import('node:http').ServerResponse) { res.setHeader('x-content-type-options','nosniff'); res.setHeader('x-frame-options','DENY'); res.setHeader('referrer-policy','no-referrer'); res.setHeader('permissions-policy','camera=(),microphone=(),geolocation=()'); }
+function securityHeaders(res: import('node:http').ServerResponse) { res.setHeader('x-content-type-options','nosniff'); res.setHeader('x-frame-options','DENY'); res.setHeader('referrer-policy','no-referrer'); res.setHeader('permissions-policy','camera=(),microphone=(),geolocation=()'); res.setHeader('cache-control','no-store'); }
 function cors(res: import('node:http').ServerResponse) { securityHeaders(res); res.setHeader('access-control-allow-origin', commandCenterOrigin); res.setHeader('access-control-allow-credentials', 'true'); res.setHeader('vary', 'Origin'); }
+function redirect(res: import('node:http').ServerResponse,url:string){res.writeHead(302,{location:url,'cache-control':'no-store'});res.end();}
 async function route(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) {
   cors(res);
-  if (req.method === 'OPTIONS') { res.setHeader('access-control-allow-methods','GET,POST,PATCH,DELETE,OPTIONS'); res.setHeader('access-control-allow-headers','authorization,content-type,x-organization-id'); res.writeHead(204); return res.end(); }
-  const method = req.method ?? 'GET'; const p = routeParts(req.url ?? '/');
+  const method = req.method ?? 'GET'; const p = routeParts(req.url ?? '/'); const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  if (method === 'OPTIONS') { res.setHeader('access-control-allow-methods','GET,POST,PATCH,DELETE,OPTIONS'); res.setHeader('access-control-allow-headers','authorization,content-type,x-organization-id'); res.writeHead(204); return res.end(); }
   if (p.length === 1 && p[0] === 'health' && method === 'GET') return writeJson(res, 200, { status: 'ok', service: 'leo-os-api' });
   if (p.length === 1 && p[0] === 'ready' && method === 'GET') { await db.$queryRaw`SELECT 1`; return writeJson(res, 200, { status: 'ready', service: 'leo-os-api', database: 'ok' }); }
+  if (p[0] === 'v1' && p[1] === 'integrations') {
+    if (p.length === 2 && method === 'GET') return writeJson(res,200,{data:await listIntegrations(db,req.headers),catalog:integrationCatalog()});
+    if (p.length === 3 && p[2] === 'catalog' && method === 'GET') { await requireOrganization(db,req.headers,'integration:manage'); return writeJson(res,200,{data:integrationCatalog()}); }
+    const provider=p[2] as OAuthProvider;
+    if (p.length === 4 && p[3] === 'start' && method === 'GET') return redirect(res,await startOAuth(db,req.headers,provider));
+    if (p.length === 4 && p[3] === 'callback' && method === 'GET') { const s=await callback(db,provider,url.searchParams); return redirect(res,`${commandCenterOrigin}/?integration=${encodeURIComponent(provider)}&connected=1&account=${encodeURIComponent(s.organizationId)}`); }
+    if (p.length === 3 && method === 'DELETE') { await revokeIntegration(db,req.headers,provider); return writeJson(res,204,null); }
+  }
   if (p[0] !== 'v1') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
   const body = ['POST','PATCH','PUT'].includes(method) ? await readJson(req) : {};
   if (p[1] === 'objectives') {
