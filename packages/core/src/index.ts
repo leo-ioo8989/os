@@ -32,3 +32,4 @@ export * from './provider-credential-foundation.js';
 export * from './tool-adapters.js';
 export * from './real-model-providers.js';
 export * from './media-production.js';
+export * from './youtube-creator.js';
