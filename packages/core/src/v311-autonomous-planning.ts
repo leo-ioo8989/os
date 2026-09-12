@@ -67,7 +67,7 @@ export function planNextStep(state: PlanningState, candidates: PlanningCandidate
     if (seen.has(candidate.stepId)) return fail('DUPLICATE_STEP');
     seen.add(candidate.stepId);
     try { validatePlanningProvenance(state, candidate); } catch { return fail('PROVENANCE_MISMATCH'); }
-    if (candidate.dependencies.includes(candidate.stepId)) return fail('DEPENDENCY_UNSATISFIED');
+    if (!completed.has(candidate.stepId) && candidate.dependencies.includes(candidate.stepId)) return fail('DEPENDENCY_UNSATISFIED');
   }
 
   const eligible = candidates.filter((candidate) => !completed.has(candidate.stepId) && candidate.dependencies.every((dependencyId) => completed.has(dependencyId)));
