@@ -1,0 +1,47 @@
+name: V3.11 Certification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/core/src/v311-autonomous-planning.ts'
+      - 'packages/core/test/v311-autonomous-planning.test.ts'
+      - 'packages/core/src/task-graph.ts'
+      - 'packages/core/src/v310-autonomous-recovery.ts'
+      - 'packages/core/src/v309-bounded-autonomy.ts'
+      - 'packages/core/src/v308-resource-governance.ts'
+      - 'packages/core/src/index.ts'
+      - 'package.json'
+      - '.github/workflows/v311-certification.yml'
+
+jobs:
+  certify-v311:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: founder_os
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d founder_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - name: Install dependencies
+        run: pnpm install
+      - name: Certify V3.11 and full Phase 1 + Phase 2 + Phase 3 regression
+        run: pnpm verify:v311
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os
