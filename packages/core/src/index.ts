@@ -34,3 +34,4 @@ export * from './real-model-providers.js';
 export * from './media-production.js';
 export * from './youtube-creator.js';
 export * from './workspace-operations.js';
+export * from './browser-computer-execution.js';
