@@ -34,3 +34,4 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os
         run: pnpm verify:phase5
+      # Certification remains fail-closed: any verification failure blocks completion.
