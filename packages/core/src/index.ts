@@ -30,3 +30,4 @@ export * from './financial-governance.js';
 export * from './phase-2-completion-contract.js';
 export * from './provider-credential-foundation.js';
 export * from './tool-adapters.js';
+export * from './real-model-providers.js';
