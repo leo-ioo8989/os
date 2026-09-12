@@ -2,7 +2,7 @@ name: V3.09 Certification
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     paths:
       - 'packages/core/src/v309-bounded-autonomy.ts'
       - 'packages/core/test/v309-bounded-autonomy.test.ts'
