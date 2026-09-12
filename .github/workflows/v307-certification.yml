@@ -1,0 +1,33 @@
+name: LEO OS V3.07 Certification
+on:
+  push:
+    branches: [main, v307-browser-computer-implementation]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  certify-v307:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: founder_os_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d founder_os_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - name: Certify V3.07
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os_test
+        run: pnpm verify:v307
