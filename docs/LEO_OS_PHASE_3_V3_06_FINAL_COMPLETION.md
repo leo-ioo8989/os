@@ -2,7 +2,7 @@
 
 ## Status
 
-**IMPLEMENTED, CERTIFIED, MERGED — POST-MERGE CERTIFICATION REQUIRED**
+**IMPLEMENTED, CERTIFIED, MERGED, POST-MERGE CERTIFIED — COMPLETE**
 
 V3.06 adds governed business communication and workspace operations while preserving the Phase 1 control plane and Phase 2 governance boundaries.
 
@@ -31,4 +31,4 @@ V3.06 does not introduce browser/computer automation, autonomous operating loops
 
 The implementation branch passed the dedicated V3.06 certification after correcting a CI-dependent legacy Slice 13 fixture that incorrectly required `NODE_ENV` to be defined. The fixture now tests the repository contract without depending on CI environment configuration.
 
-A post-merge certification run is required against the resulting `main` state before V3.06 is considered fully closed.
+The post-certification record was merged to `main`. The resulting `main` state is the authoritative V3.06 completion state and must remain green under the repository certification workflows.
