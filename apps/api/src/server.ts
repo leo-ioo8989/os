@@ -11,6 +11,7 @@ function bodyStatus(body: Record<string, unknown>, allowed: readonly string[]): 
 async function route(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) {
   const method = req.method ?? 'GET'; const p = routeParts(req.url ?? '/');
   if (p.length === 1 && p[0] === 'health' && method === 'GET') return writeJson(res, 200, { status: 'ok', service: 'leo-os-api' });
+  if (p.length === 1 && p[0] === 'ready' && method === 'GET') { await db.$queryRaw`SELECT 1`; return writeJson(res, 200, { status: 'ready', service: 'leo-os-api', database: 'ok' }); }
   if (p[0] !== 'v1') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
   const body = ['POST','PATCH','PUT'].includes(method) ? await readJson(req) : {};
   if (p[1] === 'objectives') {
