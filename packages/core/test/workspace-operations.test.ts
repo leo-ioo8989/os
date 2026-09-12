@@ -1,0 +1,23 @@
+import { describe,it } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildWorkspaceProposal, classifyWorkspaceRisk, createWorkspaceToolRequest, DeterministicWorkspaceTransport, WorkspaceProviderAdapter, validateWorkspacePayload } from '../src/workspace-operations.js';
+import { DeterministicCredentialBroker, type CredentialReference } from '../src/provider-credential-foundation.js';
+import { ToolGateway, ToolRegistry } from '../src/tool-adapters.js';
+import type { ControlPlaneWorkerBinding } from '../src/delegation.js';
+
+const credential:CredentialReference={credentialId:'cred-gmail-1',organizationId:'org-1',providerId:'google',status:'ACTIVE',scope:'gmail.send',version:1};
+const account={accountId:'acct-1',organizationId:'org-1',provider:'GMAIL' as const,credential,status:'ACTIVE' as const,allowedScopes:['gmail.send']};
+const worker:ControlPlaneWorkerBinding={organizationId:'org-1',taskId:'task-1',workerId:'worker-1',capabilities:['WORKSPACE_SEND']};
+const request={account,target:{resource:'EMAIL' as const,provider:'GMAIL' as const,accountId:'acct-1'},operation:'SEND' as const,capability:'WORKSPACE_SEND' as const,payload:{subject:'Hello',body:'Hi',recipients:['a@example.com']},correlationId:'corr-1',idempotencyKey:'idem-1',risk:'HIGH' as const,approvalRequired:false};
+
+describe('V3.06 workspace operations',()=>{
+ it('validates read/write payload separation',()=>{ assert.throws(()=>validateWorkspacePayload(undefined,'SEND','GMAIL')); validateWorkspacePayload(undefined,'READ','GMAIL'); });
+ it('classifies outbound communication as high risk',()=>assert.equal(classifyWorkspaceRisk('SEND','GMAIL'),'HIGH'));
+ it('creates proposal-only outbound communication and requires approval',()=>{const p=buildWorkspaceProposal(request,'owner-1');assert.equal(p.authority,'PROPOSAL_ONLY');assert.equal(p.approvalRequired,true);assert.equal(p.action,'SEND_MESSAGE');});
+ it('rejects cross-account target binding',()=>assert.throws(()=>buildWorkspaceProposal({...request,target:{...request.target,accountId:'acct-2'}},'owner-1')));
+ it('rejects credential-shaped authority in proposal payload',()=>assert.throws(()=>buildWorkspaceProposal({...request,payload:{...request.payload,content:'credentialId'}} as any,'owner-1')));
+ it('binds tool request to authoritative worker',()=>{const p=buildWorkspaceProposal({...request,risk:'LOW',approvalRequired:false},'owner-1');const r=createWorkspaceToolRequest({...request,risk:'LOW'},worker,p);assert.equal(r.workerId,'worker-1');assert.equal(r.organizationId,'org-1');});
+ it('denies a worker without the capability',()=>{const p=buildWorkspaceProposal({...request,risk:'LOW'},'owner-1');assert.throws(()=>createWorkspaceToolRequest({...request,risk:'LOW'}, {...worker,capabilities:[]},p));});
+ it('executes only through the V3.02 gateway with a credential broker',()=>{const registry=new ToolRegistry();const adapter=new WorkspaceProviderAdapter(account,new DeterministicCredentialBroker(new Map([['cred-gmail-1','secret']])),new DeterministicWorkspaceTransport(),'SEND');registry.register({toolId:adapter.toolId,organizationId:'org-1',capabilityId:'WORKSPACE_SEND',description:'Gmail send',input:{name:'workspace-send',validate:v=>!!v&&typeof v==='object'},output:{name:'workspace-result',validate:v=>!!v&&typeof v==='object'},risk:'HIGH',idempotent:true,requiredApproval:true,provenance:'v3.06'},adapter);const gateway=new ToolGateway(registry);const p=buildWorkspaceProposal({...request,risk:'HIGH'},'owner-1');const tr={...createWorkspaceToolRequest({...request,risk:'HIGH'},worker,p),approvalValid:true};const result=gateway.invoke(tr,{worker,approvalValid:true});assert.equal(result.status,'SUCCESS');});
+ it('never exposes credential secret through deterministic adapter result',()=>{const registry=new ToolRegistry();const adapter=new WorkspaceProviderAdapter(account,new DeterministicCredentialBroker(new Map([['cred-gmail-1','super-secret']])),new DeterministicWorkspaceTransport(),'SEND');registry.register({toolId:adapter.toolId,organizationId:'org-1',capabilityId:'WORKSPACE_SEND',description:'Gmail send',input:{name:'i',validate:v=>!!v&&typeof v==='object'},output:{name:'o',validate:v=>!!v&&typeof v==='object'},risk:'LOW',idempotent:true,requiredApproval:false,provenance:'v3.06'},adapter);const gateway=new ToolGateway(registry);const p=buildWorkspaceProposal({...request,risk:'LOW'},'owner-1');const result=gateway.invoke(createWorkspaceToolRequest({...request,risk:'LOW'},worker,p),{worker,approvalValid:true});assert.equal(result.status,'SUCCESS');assert.ok(!JSON.stringify(result).includes('super-secret'));});
+});
