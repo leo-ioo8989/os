@@ -36,3 +36,4 @@ export * from './youtube-creator.js';
 export * from './workspace-operations.js';
 export * from './browser-computer-execution.js';
 export * from './v308-resource-governance.js';
+export * from './v309-bounded-autonomy.js';
