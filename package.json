@@ -28,6 +28,7 @@
     "verify:v301": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "verify:v302": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "verify:v303": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
+    "verify:v304": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "format": "prettier --write ."
   },
   "devDependencies": { "@types/node": "^22.15.0", "prettier": "^3.6.2", "typescript": "^5.9.2" }
