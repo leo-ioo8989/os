@@ -75,7 +75,7 @@ export function planNextStep(state: PlanningState, candidates: PlanningCandidate
   const orderedIds = ordered.map((candidate) => candidate.stepId);
   if (ordered.length === 0) return fail('NO_ELIGIBLE_STEP');
 
-  const selected = ordered[0];
+  const selected = ordered[0]!;
   if (selected.risk === 'CRITICAL' || selected.risk === 'RED') {
     return { authority: PLANNING_AUTHORITY, policyVersion: V311_POLICY_VERSION, decision: 'APPROVAL_REQUIRED', reason: 'RISK_REQUIRES_APPROVAL', orderedEligibleStepIds: orderedIds };
   }
