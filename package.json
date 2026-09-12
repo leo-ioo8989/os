@@ -26,6 +26,7 @@
     "verify:v108": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm test:unit && pnpm test:integration",
     "verify:v109": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm test:unit && pnpm test:integration",
     "verify:v301": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
+    "verify:v302": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "format": "prettier --write ."
   },
   "devDependencies": {
