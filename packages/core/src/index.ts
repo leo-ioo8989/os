@@ -33,3 +33,4 @@ export * from './tool-adapters.js';
 export * from './real-model-providers.js';
 export * from './media-production.js';
 export * from './youtube-creator.js';
+export * from './workspace-operations.js';
