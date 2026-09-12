@@ -41,6 +41,7 @@ export function buildWorkspaceProposal(input:WorkspaceOperationRequest, ownerUse
   if(input.account.status!=='ACTIVE') throw new Error('Workspace account is not active');
   if(input.target.provider!==input.account.provider) throw new Error('Provider mismatch');
   validateWorkspacePayload(input.payload,input.operation,input.target.provider);
+  safe(input.payload);
   const action:WorkspaceOperationProposal['action']=input.operation==='SEND'?'SEND_MESSAGE':input.operation==='DELETE'?'DELETE_RESOURCE':input.operation==='READ'?'CREATE_RESOURCE':input.operation==='CREATE'?'CREATE_RESOURCE':'UPDATE_RESOURCE';
   if(input.operation==='READ') throw new Error('Read operations are not external-action side effects');
   const proposal:WorkspaceOperationProposal={proposalId:`${input.account.organizationId}:workspace:${input.idempotencyKey}`,organizationId:input.account.organizationId,ownerUserId,action,target:`${input.target.provider.toLowerCase()}:${input.target.resource.toLowerCase()}:${input.target.resourceId??input.target.accountId}`,purpose:`${input.operation} ${input.target.resource} through governed workspace adapter`,risk:input.risk,approvalRequired:input.approvalRequired||input.risk==='HIGH'||input.risk==='CRITICAL',authority:'PROPOSAL_ONLY',provenance:'workspace-operations-v3.06',provider:input.target.provider,operation:input.operation,accountId:input.account.accountId,resource:input.target.resource};
