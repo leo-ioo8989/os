@@ -5,10 +5,14 @@ import { ApiError, errorBody } from './errors.js';
 import { readJson, routeParts, pathId, writeJson } from './http.js';
 import { addDependency, changeObjectiveStatus, changeTaskStatus, createObjective, createTask, deleteObjective, deleteTask, getObjective, getTask, listObjectives, listTasks, removeDependency, updateObjective, updateTask } from './control-plane.js';
 const port = Number(process.env.PORT ?? 4000);
+const commandCenterOrigin = process.env.COMMAND_CENTER_ORIGIN ?? 'http://localhost:4173';
 const objectiveStatuses = ['DRAFT','PLANNING','READY','RUNNING','WAITING_APPROVAL','BLOCKED','PAUSED','COMPLETED','FAILED','CANCELLED'] as const;
 const taskStatuses = ['PENDING','READY','RUNNING','WAITING_APPROVAL','BLOCKED','FAILED','COMPLETED','CANCELLED'] as const;
 function bodyStatus(body: Record<string, unknown>, allowed: readonly string[]): string { if (typeof body.status !== 'string' || !allowed.includes(body.status)) throw new ApiError(422, 'VALIDATION_ERROR', 'status is invalid.'); return body.status; }
+function cors(res: import('node:http').ServerResponse) { res.setHeader('access-control-allow-origin', commandCenterOrigin); res.setHeader('access-control-allow-credentials', 'true'); res.setHeader('vary', 'Origin'); }
 async function route(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) {
+  cors(res);
+  if (req.method === 'OPTIONS') { res.setHeader('access-control-allow-methods','GET,POST,PATCH,DELETE,OPTIONS'); res.setHeader('access-control-allow-headers','authorization,content-type,x-organization-id'); res.writeHead(204); return res.end(); }
   const method = req.method ?? 'GET'; const p = routeParts(req.url ?? '/');
   if (p.length === 1 && p[0] === 'health' && method === 'GET') return writeJson(res, 200, { status: 'ok', service: 'leo-os-api' });
   if (p.length === 1 && p[0] === 'ready' && method === 'GET') { await db.$queryRaw`SELECT 1`; return writeJson(res, 200, { status: 'ready', service: 'leo-os-api', database: 'ok' }); }
@@ -36,5 +40,5 @@ async function route(req: import('node:http').IncomingMessage, res: import('node
   }
   throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
 }
-const server = createServer(async (req, res) => { try { await route(req, res); } catch (error) { writeJson(res, error instanceof ApiError ? error.status : 500, errorBody(error)); } });
+const server = createServer(async (req, res) => { try { await route(req, res); } catch (error) { cors(res); writeJson(res, error instanceof ApiError ? error.status : 500, errorBody(error)); } });
 server.listen(port, () => console.log(`LEO OS API listening on :${port}`));
