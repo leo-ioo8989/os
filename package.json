@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "dev": "pnpm --parallel --filter './apps/*' dev",
+    "start": "pnpm --parallel --filter './apps/*' start",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
@@ -36,7 +37,8 @@
     "verify:v310": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "verify:v311": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
     "verify:phase4": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration",
-    "verify:phase5": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm --filter @founder-os/core test && pnpm test:unit && pnpm test:integration && pnpm verify:v311",
+    "verify:phase5": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm test:unit && pnpm test:integration && pnpm verify:v311",
+    "verify:production": "pnpm db:generate && pnpm db:validate && pnpm db:migrate && pnpm db:smoke && pnpm typecheck && pnpm lint && pnpm build && pnpm test:unit && pnpm test:integration",
     "format": "prettier --write ."
   },
   "devDependencies": { "@types/node": "^22.15.0", "prettier": "^3.6.2", "typescript": "^5.9.2" }
