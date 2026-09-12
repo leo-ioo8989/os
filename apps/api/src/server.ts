@@ -9,7 +9,8 @@ const commandCenterOrigin = process.env.COMMAND_CENTER_ORIGIN ?? 'http://localho
 const objectiveStatuses = ['DRAFT','PLANNING','READY','RUNNING','WAITING_APPROVAL','BLOCKED','PAUSED','COMPLETED','FAILED','CANCELLED'] as const;
 const taskStatuses = ['PENDING','READY','RUNNING','WAITING_APPROVAL','BLOCKED','FAILED','COMPLETED','CANCELLED'] as const;
 function bodyStatus(body: Record<string, unknown>, allowed: readonly string[]): string { if (typeof body.status !== 'string' || !allowed.includes(body.status)) throw new ApiError(422, 'VALIDATION_ERROR', 'status is invalid.'); return body.status; }
-function cors(res: import('node:http').ServerResponse) { res.setHeader('access-control-allow-origin', commandCenterOrigin); res.setHeader('access-control-allow-credentials', 'true'); res.setHeader('vary', 'Origin'); }
+function securityHeaders(res: import('node:http').ServerResponse) { res.setHeader('x-content-type-options','nosniff'); res.setHeader('x-frame-options','DENY'); res.setHeader('referrer-policy','no-referrer'); res.setHeader('permissions-policy','camera=(),microphone=(),geolocation=()'); }
+function cors(res: import('node:http').ServerResponse) { securityHeaders(res); res.setHeader('access-control-allow-origin', commandCenterOrigin); res.setHeader('access-control-allow-credentials', 'true'); res.setHeader('vary', 'Origin'); }
 async function route(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) {
   cors(res);
   if (req.method === 'OPTIONS') { res.setHeader('access-control-allow-methods','GET,POST,PATCH,DELETE,OPTIONS'); res.setHeader('access-control-allow-headers','authorization,content-type,x-organization-id'); res.writeHead(204); return res.end(); }
