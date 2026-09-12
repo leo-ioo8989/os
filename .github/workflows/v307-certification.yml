@@ -14,11 +14,13 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: founder_os_test
+          POSTGRES_DB: founder_os
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U postgres -d founder_os_test"
-          --health-interval 10s --health-timeout 5s --health-retries 5
+          --health-cmd "pg_isready -U postgres -d founder_os"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,7 +29,6 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10.15.0
+          run_install: true
       - name: Certify V3.07
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os_test
         run: pnpm verify:v307
