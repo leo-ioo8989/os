@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   'task:write',
   'workflow:run',
   'approval:decide',
+  'integration:use',
   'integration:manage',
   'tool:execute',
   'production:deploy',
@@ -21,12 +22,12 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   FOUNDER: PERMISSIONS,
   ADMIN: [
     'objective:read', 'objective:write', 'task:read', 'task:write',
-    'workflow:run', 'approval:decide', 'integration:manage', 'tool:execute',
+    'workflow:run', 'approval:decide', 'integration:use', 'integration:manage', 'tool:execute',
     'audit:read', 'security:manage',
   ],
   OPERATOR: [
     'objective:read', 'objective:write', 'task:read', 'task:write',
-    'workflow:run', 'tool:execute', 'audit:read',
+    'workflow:run', 'integration:use', 'tool:execute', 'audit:read',
   ],
   VIEWER: ['objective:read', 'task:read', 'audit:read'],
 };
