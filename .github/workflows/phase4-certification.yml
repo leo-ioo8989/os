@@ -1,0 +1,37 @@
+name: LEO OS Phase 4 Certification
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/core/src/v4*.ts'
+      - 'packages/core/src/phase4-operationalization.ts'
+      - 'packages/core/test/phase4-operationalization.test.ts'
+      - 'packages/core/src/index.ts'
+      - 'package.json'
+      - '.github/workflows/phase4-certification.yml'
+jobs:
+  certify-phase4:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: founder_os
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d founder_os"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - uses: pnpm/action-setup@v4
+        with: {version: 10.15.0}
+      - name: Install dependencies
+        run: pnpm install
+      - name: Phase 4 full certification — V4.01 through V4.12 + prior phases
+        run: pnpm verify:phase4
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os
