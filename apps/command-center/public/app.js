@@ -1,9 +1,10 @@
 const api = window.LEO_OS_API ?? 'http://localhost:4000';
+const options = { credentials: 'include', headers: { accept: 'application/json' } };
 const $ = (id) => document.getElementById(id);
 async function load(){
-  try { const h=await fetch(`${api}/health`); $('health').textContent=h.ok?'API: online':'API: unavailable'; } catch { $('health').textContent='API: unavailable'; }
+  try { const h=await fetch(`${api}/health`, options); $('health').textContent=h.ok?'API: online':'API: unavailable'; } catch { $('health').textContent='API: unavailable'; }
   try {
-    const r=await fetch(`${api}/v1/objectives`); if(!r.ok) throw new Error('auth');
+    const r=await fetch(`${api}/v1/objectives`, options); if(!r.ok) throw new Error('auth');
     const items=(await r.json()).data ?? [];
     const counts={total:items.length,active:items.filter(x=>['RUNNING','PLANNING','READY'].includes(x.status)).length,completed:items.filter(x=>x.status==='COMPLETED').length,blocked:items.filter(x=>['BLOCKED','FAILED'].includes(x.status)).length};
     $('cards').innerHTML=Object.entries({Objectives:counts.total,Active:counts.active,Completed:counts.completed,'Needs attention':counts.blocked}).map(([k,v])=>`<article class="card"><div class="label">${k}</div><div class="value">${v}</div></article>`).join('');
