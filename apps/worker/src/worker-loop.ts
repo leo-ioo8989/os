@@ -43,26 +43,23 @@ export class DurableWorkerLoop {
     try {
       while (!this.stopRequested && !this.options.signal?.aborted) {
         await this.recoverAndDispatch();
-        if (!this.active.size) {
-          await new Promise(resolve => setTimeout(resolve, this.pollMs));
-        } else {
-          await Promise.race([...this.active]);
-        }
+        if (!this.active.size) await new Promise(resolve => setTimeout(resolve, this.pollMs));
+        else await Promise.race([...this.active]);
       }
       await Promise.allSettled([...this.active]);
-    } finally {
-      this.running = false;
-      this.stopRequested = false;
-    }
+    } finally { this.running = false; this.stopRequested = false; }
   }
 
   stop(): void { this.stopRequested = true; }
 
   private async recoverAndDispatch(): Promise<void> {
     const jobs = await this.jobs.list(this.options.organizationId);
-    for (const job of jobs) {
+    for (const listedJob of jobs) {
       if (this.stopRequested || this.options.signal?.aborted || this.active.size >= this.concurrency) break;
-      if (job.status !== 'QUEUED' && job.status !== 'RETRY_QUEUED' && job.status !== 'CLAIMED') continue;
+      const job = (listedJob.status === 'CLAIMED' || listedJob.status === 'RUNNING' || listedJob.status === 'RETRY_QUEUED')
+        ? await this.jobs.resumeCandidate(this.options.organizationId, listedJob.id)
+        : listedJob;
+      if (!job || (job.status !== 'QUEUED' && job.status !== 'RETRY_QUEUED' && job.status !== 'CLAIMED')) continue;
       const task = job.taskId ? await this.db.task.findFirst({ where: { id: job.taskId, objective: { organizationId: this.options.organizationId } } }) : null;
       if (!task) continue;
       const metadata = task.metadata as Record<string, unknown> | null;
