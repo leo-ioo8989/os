@@ -1,0 +1,9 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { ExecutionHandlerRegistry, validateHandlerResult } from './execution-handlers.js';
+import { createIntegrationHandlers } from './integration-handlers.js';
+
+test('registry contains deterministic internal handlers',()=>{const registry=new ExecutionHandlerRegistry();assert.ok(registry.get('internal.noop'));assert.ok(registry.get('internal.calculate'));assert.ok(registry.get('internal.checkpoint'))});
+test('registry rejects duplicate handler ids',()=>{assert.throws(()=>new ExecutionHandlerRegistry([{id:'internal.noop',description:'duplicate',requiredCapability:'internal.execute',risk:'LOW',deterministic:true,testSafe:true,validateInput:()=>true,validateOutput:()=>true,execute:async()=>({status:'SUCCEEDED',output:{}})}]))});
+test('integration capabilities are registered without exposing secrets',()=>{const registry=new ExecutionHandlerRegistry(createIntegrationHandlers({} as never));for(const id of ['google.gmail.list','google.gmail.send','google.calendar.list','google.calendar.create','google.drive.list','google.drive.create','slack.channels.list','slack.message.send','github.repos.list','github.issue.create','github.workflow.dispatch'])assert.ok(registry.get(id));assert.equal(registry.get('github.workflow.dispatch')?.risk,'CRITICAL');assert.equal(registry.get('google.gmail.send')?.deterministic,false)});
+test('result validation is fail-closed',()=>{const registry=new ExecutionHandlerRegistry();const handler=registry.get('internal.noop')!;assert.equal(validateHandlerResult(handler,{status:'SUCCEEDED',output:{executed:true}}).valid,true);assert.equal(validateHandlerResult(handler,{status:'SUCCEEDED',output:{},error:{code:'x',message:'x',retryable:false}}).valid,false);assert.equal(validateHandlerResult(handler,{status:'FAILED'} as never).valid,false)});
