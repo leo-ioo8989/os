@@ -20,6 +20,7 @@ export class DurableWorkerLoop {
   private readonly jobs: JobService;
   private readonly runtime: WorkerRuntime;
   private running = false;
+  private stopRequested = false;
   private readonly pollMs: number;
   private readonly concurrency: number;
   private active = new Set<Promise<unknown>>();
@@ -31,29 +32,36 @@ export class DurableWorkerLoop {
       authorizeExecution: options.authorizeExecution,
       consumeExecutionApproval: options.consumeExecutionApproval,
     });
-    this.pollMs = options.pollMs ?? 1000;
+    this.pollMs = Math.max(100, options.pollMs ?? 1000);
     this.concurrency = Math.max(1, Math.min(options.concurrency ?? 2, 16));
   }
 
   async run(): Promise<void> {
     if (this.running) throw new Error('Worker loop is already running.');
     this.running = true;
+    this.stopRequested = false;
     try {
-      while (!this.options.signal?.aborted) {
+      while (!this.stopRequested && !this.options.signal?.aborted) {
         await this.recoverAndDispatch();
-        if (!this.active.size) await new Promise(resolve => setTimeout(resolve, this.pollMs));
-        else await Promise.race([...this.active]);
+        if (!this.active.size) {
+          await new Promise(resolve => setTimeout(resolve, this.pollMs));
+        } else {
+          await Promise.race([...this.active]);
+        }
       }
       await Promise.allSettled([...this.active]);
-    } finally { this.running = false; }
+    } finally {
+      this.running = false;
+      this.stopRequested = false;
+    }
   }
 
-  stop(): void { this.running = false; }
+  stop(): void { this.stopRequested = true; }
 
   private async recoverAndDispatch(): Promise<void> {
     const jobs = await this.jobs.list(this.options.organizationId);
     for (const job of jobs) {
-      if (this.active.size >= this.concurrency) break;
+      if (this.stopRequested || this.options.signal?.aborted || this.active.size >= this.concurrency) break;
       if (job.status !== 'QUEUED' && job.status !== 'RETRY_QUEUED' && job.status !== 'CLAIMED') continue;
       const task = job.taskId ? await this.db.task.findFirst({ where: { id: job.taskId, objective: { organizationId: this.options.organizationId } } }) : null;
       if (!task) continue;
