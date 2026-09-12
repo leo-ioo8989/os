@@ -64,3 +64,4 @@ export * from './v509-autonomous-workflows.js';
 export * from './v510-evaluation-optimization.js';
 export * from './v511-executive-intelligence.js';
 export * from './v512-phase5-certification.js';
+export * from './integration-runtime.js';
