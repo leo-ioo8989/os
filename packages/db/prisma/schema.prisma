@@ -34,6 +34,7 @@ model Organization {
   checkpoints Checkpoint[]
   workers Worker[]
   connectedIntegrations ConnectedIntegration[]
+  workspaces Workspace[]
 }
 model User {
   id String @id @default(cuid())
@@ -48,6 +49,7 @@ model User {
   requestedApprovals Approval[] @relation("ApprovalRequester")
   decidedApprovals Approval[] @relation("ApprovalDecider")
   connectedIntegrations ConnectedIntegration[]
+  workspaces Workspace[]
 }
 model Membership {
   userId String
@@ -316,4 +318,21 @@ model ConnectedIntegration {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([organizationId, provider, accountId])
   @@index([organizationId, provider, revokedAt])
+}
+model Workspace {
+  id String @id
+  organizationId String
+  createdBy String
+  title String
+  kind String
+  status String @default("ACTIVE")
+  intent String
+  content Json
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  @@index([organizationId, updatedAt])
+  @@index([organizationId, kind])
 }
