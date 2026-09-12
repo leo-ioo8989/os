@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { IntelligenceProvider, IntelligenceRequest, IntelligenceProposal } from './v503-intelligence-gateway.js';
 
 export type ProviderRuntimeConfig = {
-  openai?: { apiKey: string; model: string };
-  anthropic?: { apiKey: string; model: string };
+  openai?: { apiKey: string; model: string; enabled?: boolean };
+  anthropic?: { apiKey: string; model: string; enabled?: boolean };
   timeoutMs?: number;
   maxRetries?: number;
 };
@@ -11,10 +11,12 @@ export type ProviderRuntimeConfig = {
 type ProviderResponse = { content: string; inputTokens?: number; outputTokens?: number };
 
 async function jsonRequest(url: string, init: RequestInit, timeoutMs: number, maxRetries: number): Promise<any> {
+  const boundedTimeout = Math.max(1000, Math.min(timeoutMs, 120000));
+  const boundedRetries = Math.max(0, Math.min(maxRetries, 4));
   let last: unknown;
-  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+  for (let attempt = 0; attempt <= boundedRetries; attempt += 1) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), boundedTimeout);
     try {
       const response = await fetch(url, { ...init, signal: controller.signal });
       const text = await response.text();
@@ -28,21 +30,23 @@ async function jsonRequest(url: string, init: RequestInit, timeoutMs: number, ma
     } finally {
       clearTimeout(timer);
     }
-    if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt));
+    if (attempt < boundedRetries) await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt));
   }
   throw last instanceof Error ? last : new Error('Provider request failed.');
 }
 
 function proposal(request: IntelligenceRequest, provider: string, content: string, inputTokens?: number, outputTokens?: number): IntelligenceProposal {
+  if (!content.trim()) throw new Error('Provider returned an empty intelligence proposal.');
   return {
     proposalId: randomUUID(), provider, content, confidence: 0.9,
     correlationId: request.correlationId,
-    provenance: { requestId: randomUUID(), policyVersion: 'V5.03-provider-runtime-1', createdAt: new Date().toISOString() },
+    provenance: { requestId: randomUUID(), policyVersion: 'V5.03-provider-runtime-2', createdAt: new Date().toISOString() },
     ...(inputTokens === undefined && outputTokens === undefined ? {} : { usage: { inputTokens, outputTokens } } as any),
   };
 }
 
-export function createOpenAIProvider(config: { apiKey: string; model: string }, options: Pick<ProviderRuntimeConfig, 'timeoutMs' | 'maxRetries'> = {}): IntelligenceProvider {
+export function createOpenAIProvider(config: { apiKey: string; model: string; enabled?: boolean }, options: Pick<ProviderRuntimeConfig, 'timeoutMs' | 'maxRetries'> = {}): IntelligenceProvider {
+  if (!config.apiKey.trim() || !config.model.trim()) throw new Error('OpenAI provider configuration is incomplete.');
   const timeoutMs = options.timeoutMs ?? 45000, maxRetries = options.maxRetries ?? 2;
   return { name: 'openai', async propose(request) {
     const body = await jsonRequest('https://api.openai.com/v1/responses', {
@@ -54,7 +58,8 @@ export function createOpenAIProvider(config: { apiKey: string; model: string }, 
   }};
 }
 
-export function createAnthropicProvider(config: { apiKey: string; model: string }, options: Pick<ProviderRuntimeConfig, 'timeoutMs' | 'maxRetries'> = {}): IntelligenceProvider {
+export function createAnthropicProvider(config: { apiKey: string; model: string; enabled?: boolean }, options: Pick<ProviderRuntimeConfig, 'timeoutMs' | 'maxRetries'> = {}): IntelligenceProvider {
+  if (!config.apiKey.trim() || !config.model.trim()) throw new Error('Anthropic provider configuration is incomplete.');
   const timeoutMs = options.timeoutMs ?? 45000, maxRetries = options.maxRetries ?? 2;
   return { name: 'anthropic', async propose(request) {
     const body = await jsonRequest('https://api.anthropic.com/v1/messages', {
@@ -67,10 +72,17 @@ export function createAnthropicProvider(config: { apiKey: string; model: string 
 }
 
 export function configuredProviders(config: ProviderRuntimeConfig = {
-  openai: process.env.OPENAI_API_KEY ? { apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna' } : undefined,
-  anthropic: process.env.ANTHROPIC_API_KEY ? { apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5' } : undefined,
+  openai: process.env.OPENAI_API_KEY ? { apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna', enabled: process.env.LEO_OS_OPENAI_ENABLED === 'true' } : undefined,
+  anthropic: process.env.ANTHROPIC_API_KEY ? { apiKey: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5', enabled: process.env.LEO_OS_ANTHROPIC_ENABLED === 'true' } : undefined,
 }): IntelligenceProvider[] {
-  return [config.openai && createOpenAIProvider(config.openai, config), config.anthropic && createAnthropicProvider(config.anthropic, config)].filter(Boolean) as IntelligenceProvider[];
+  const providers: IntelligenceProvider[] = [];
+  if (config.openai?.enabled !== false) {
+    if (config.openai) providers.push(createOpenAIProvider(config.openai, config));
+  }
+  if (config.anthropic?.enabled !== false) {
+    if (config.anthropic) providers.push(createAnthropicProvider(config.anthropic, config));
+  }
+  return providers;
 }
 
 export function createFailoverProvider(providers: IntelligenceProvider[]): IntelligenceProvider {
