@@ -1,0 +1,16 @@
+import { randomBytes } from 'node:crypto';
+import type { IncomingHttpHeaders } from 'node:http';
+import type { PrismaClient } from '@prisma/client';
+import { requireOrganization } from './auth-context.js';
+import { ApiError } from './errors.js';
+import { decrypt, encrypt } from './integration-vault.js';
+type Provider='google'|'slack'|'github';
+const TOKEN_URL:Record<Provider,string>={google:'https://oauth2.googleapis.com/token',slack:'https://slack.com/api/oauth.v2.access',github:'https://github.com/login/oauth/access_token'};
+const CLIENT_KEYS:Record<Provider,[string,string]>={google:['GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET'],slack:['SLACK_CLIENT_ID','SLACK_CLIENT_SECRET'],github:['GITHUB_CLIENT_ID','GITHUB_CLIENT_SECRET']};
+const CAPABILITIES:Record<Provider,string[]>={google:['gmail.read','gmail.send','calendar.read','calendar.write','drive.read','drive.write'],slack:['slack.read','slack.send'],github:['github.read','github.write','github.workflow']};
+function provider(v:string):Provider{if(v==='google'||v==='slack'||v==='github')return v;throw new ApiError(404,'NOT_FOUND','Integration provider not found.');}
+function client(p:Provider){const[idKey,secretKey]=CLIENT_KEYS[p],id=process.env[idKey],secret=process.env[secretKey];if(!id||!secret)throw new ApiError(500,'INTERNAL_ERROR','Integration OAuth is not configured.');return{id,secret};}
+async function refresh(p:Provider,refreshToken:string){const{id,secret}=client(p);const body=new URLSearchParams({client_id:id,client_secret:secret,refresh_token:refreshToken,grant_type:'refresh_token'});const r=await fetch(TOKEN_URL[p],{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded',accept:'application/json'},body});const x=await r.json() as Record<string,unknown>;if(!r.ok||typeof x.access_token!=='string')throw new ApiError(502,'INTERNAL_ERROR','Integration token refresh failed.');return x;}
+export async function getAccessToken(db:PrismaClient,headers:IncomingHttpHeaders,providerInput:string){const p=provider(providerInput),c=await requireOrganization(db,headers,'integration:manage');const rows=await db.$queryRaw<Array<{id:string;accessTokenEnc:string;refreshTokenEnc:string|null;expiresAt:Date|null}>>`SELECT "id","accessTokenEnc","refreshTokenEnc","expiresAt" FROM "ConnectedIntegration" WHERE "organizationId"=${c.organizationId} AND "provider"=${p} AND "revokedAt" IS NULL ORDER BY "updatedAt" DESC LIMIT 1`;const row=rows[0];if(!row)throw new ApiError(404,'NOT_FOUND',`No connected ${p} integration.`);if(row.expiresAt&&row.expiresAt.getTime()<=Date.now()+60000){if(!row.refreshTokenEnc)throw new ApiError(401,'INTEGRATION_REAUTH_REQUIRED','Integration authorization has expired.');const token=await refresh(p,decrypt(row.refreshTokenEnc)),access=String(token.access_token),expires=token.expires_in?new Date(Date.now()+Number(token.expires_in)*1000):null;await db.$executeRaw`UPDATE "ConnectedIntegration" SET "accessTokenEnc"=${encrypt(access)},"expiresAt"=${expires},"updatedAt"=NOW() WHERE "id"=${row.id} AND "organizationId"=${c.organizationId}`;return access;}return decrypt(row.accessTokenEnc);}
+export function capabilities(providerInput:string){return CAPABILITIES[provider(providerInput)];}
+export function integrationRequestId(){return randomBytes(16).toString('hex');}

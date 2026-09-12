@@ -3,60 +3,37 @@
 **Product:** LEO OS — Leadership & Execution Operating System  
 **Audit date:** 2026-09-12  
 **Repository:** `haeshitsa/firsy`  
-**Branch:** `main`  
-**Version target:** Phase 2 complete; Phase 3 planned, not implemented
+**Current work:** Production completion before final runtime certification
 
-## INTERNAL / PRIVATE STATUS
-LEO OS is a private internal operating system intended to run company workflows on a local/private environment. External integrations and autonomous external actions are not yet enabled.
+## FROZEN ARCHITECTURE
 
-## PHASE 1 STATUS
-V1.01 through V1.09 control-plane milestones are implemented and certified. **Phase 1 — RUNTIME CERTIFIED WITH DOCUMENTED LIMITATIONS.**
+Phase 1, Phase 2 and Phase 3 are frozen and certified. Phase 3 ends at V3.11; there is no V3.12+. Phase 4 (V4.01–V4.12) and Phase 5 (V5.01–V5.12) have been implemented with their certification gates previously passing.
 
-## PHASE 2 STATUS
-**PHASE 2 — VERIFIED/CERTIFIED AND MERGED.**
+The architecture preserves one authority chain:
 
-Phase 2 adds governed intelligence and operating-loop boundaries around the frozen Phase 1 control plane. The 17-slice phase ends at Slice 17, the integrated operating contract and certification gate.
+**INTELLIGENCE MAY PROPOSE → POLICY MAY AUTHORIZE → CONTROL PLANE DECIDES → EXECUTORS EXECUTE → LEO OS RECORDS.**
 
-Certified completion head before merge: `f3f6abccfe5486cc80f2982110fbc6ff1722cd28`.
-Certification: GitHub Actions **run #293**, run ID `34644907941`, terminal **SUCCESS**.
-Phase 2 completion merge: `6a45e7ec111d0f18a3ca7bf31bc68c8f0f7cc092`.
+## PRODUCTION COMPLETION
 
-## PHASE 2 — 17 SLICES
-1. Intent → Plan Proposal
-2. Provider-neutral Model Abstraction
-3. CEO Reasoning / Decision Intelligence
-4. Governed Memory & Company Knowledge
-5. Model Runtime & Routing Boundary
-6. LEO Executive Identity & CEO Operating Loop
-7. Governed AI Workforce, Capability & Provider Registry
-8. Governed Delegation & Workforce Execution
-9. Governed Outcome Evaluation & QA Decision Boundary
-10. Governed Executive Continuation & Objective Feedback Loop
-11. Durable Executive Decision State & Audit Boundary
-12. Governed Workforce Lifecycle & Staffing Decision Boundary
-13. Governed Operating Event Orchestration
-14. Governed External Action Proposal Boundary
-15. Governed Proactive Intelligence Boundary
-16. Governed Financial Spend Proposal Boundary
-17. Phase 2 Integrated Operating Contract & Certification Gate
+The `production-completion` branch adds the remaining productization surface identified after Phase 5:
 
-## PHASE 2 FINAL OPERATING CHAIN
-OWNER INTENT → LEO EXECUTIVE → PLAN/CAPABILITY REQUIREMENTS → WORKFORCE/PROVIDER ELIGIBILITY → DELEGATION → EXISTING DURABLE JOB/DISPATCH/WORKER RUNTIME/EXECUTION GATEWAY → VALIDATED RESULT → OUTCOME EVALUATION → EXECUTIVE CONTINUATION → DURABLE EXECUTIVE HISTORY → GOVERNED OPERATING EVENT → EXTERNAL ACTION / PROACTIVE WORK / SPEND PROPOSAL → EXISTING CONTROL PLANE.
+- dependency-free private Command Center web app;
+- authenticated API integration for live objective visibility;
+- API liveness and PostgreSQL readiness probes;
+- production-readiness documentation and local operating instructions;
+- refreshed repository state documentation so stale Phase-2-only status is removed.
 
-Phase 2 introduces no second executor, no second control plane, and no new source of truth for execution authority. Proposal-only boundaries cannot grant approval, permissions, capabilities, worker identity, credentials, spending authority, or external-action authority.
+The Command Center is deliberately read-only for operational state in this baseline. Mutations remain behind the existing authenticated API/control-plane path. No second executor, policy engine or authorization source is introduced.
 
-## STRESS EVIDENCE
-The completion branch certified a deterministic **20,480-case** matrix: 32 company domains × 8 task forms × 8 contexts × 10 semantic variants. It covered capability inference, proposal validation, organization binding, risk/approval semantics, unknown/ambiguous behavior, and authority non-leakage.
+## PRIVATE / INTERNAL BOUNDARY
 
-## SLICE 8 REGRESSION RESOLUTION
-The final Phase 2 certification included the repaired Slice 8 durable delegation path. The production bridge reaches the existing Phase 1 durable Job → Dispatcher → Worker Runtime → Execution Gateway → Handler → Result Validation path. Run #293 passed both the historical V1.07/V1.08 gate and the complete V1.01→V1.09 regression gate.
+LEO OS remains private company infrastructure. This completion pass does not activate Gmail, Instagram, MCP, model providers, n8n, browser/computer automation, or public SaaS integrations. Those remain explicit architectural decisions behind the existing adapter and authorization boundaries.
 
-## PHASE 2 FREEZE
-Phase 2 is now frozen. Do not add more Phase 2 slices, reopen certified Slice 8, or replace Phase 1 execution primitives unless a new architectural decision explicitly authorizes it.
+## CERTIFICATION STATUS
 
-## PHASE 3 STATUS
-**PLANNED ONLY — NOT IMPLEMENTED.**
+**Do not call the `production-completion` branch runtime-certified yet.** Code completion is being separated from the final verification gate as requested. After all implementation work is complete, the final head should undergo the full certification/regression process and only then be declared locked.
 
-Phase 3 will focus on turning the governed operating system into a controlled real-world company execution platform through explicit adapters, credentials, external tools, creator workflows, observability, and bounded autonomous operation. Phase 3 must preserve all Phase 1 and Phase 2 invariants and must never bypass the control plane.
-
-See `docs/LEO_OS_PHASE_3_PLAN.md`.
+See:
+- `docs/LEO_OS_PHASE_4_PHASE_5_FULL_ARCHITECTURE.md`
+- `docs/LEO_OS_PRODUCTION_READINESS.md`
+- `docs/LEO_OS_PHASE_5_FREEZE.md`

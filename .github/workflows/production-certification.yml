@@ -1,0 +1,69 @@
+name: LEO OS Production Certification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leo-os-production-certification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-certification:
+    name: production-certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: founder_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d founder_os_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os_test
+      NODE_ENV: test
+      LEO_OS_WORKER_RUN: false
+      SESSION_SECRET: certification-only-session-secret
+      INTEGRATION_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.15.0 --activate
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Validate Prisma schema
+        run: pnpm db:validate
+      - name: Apply migrations
+        run: pnpm db:migrate
+      - name: Database smoke test
+        run: pnpm db:smoke
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Build
+        run: pnpm build
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Integration tests
+        run: pnpm test:integration

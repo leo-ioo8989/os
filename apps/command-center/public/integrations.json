@@ -1,0 +1,7 @@
+[
+ {"id":"google","name":"Google Workspace","description":"Gmail, Calendar and Drive","oauth":true,"color":"#4285f4"},
+ {"id":"slack","name":"Slack","description":"Messages, channels and team context","oauth":true,"color":"#611f69"},
+ {"id":"github","name":"GitHub","description":"Repositories, issues, pull requests and workflows","oauth":true,"color":"#24292f"},
+ {"id":"openai","name":"OpenAI","description":"Governed intelligence provider","oauth":false,"color":"#10a37f"},
+ {"id":"anthropic","name":"Anthropic","description":"Governed intelligence provider","oauth":false,"color":"#d97757"}
+]
