@@ -1,0 +1,72 @@
+name: LEO OS Step 1 Runtime Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/core/**'
+      - 'apps/worker/**'
+      - 'apps/api/src/execution-gateway.ts'
+      - 'apps/api/src/integration-runtime.ts'
+      - 'apps/api/src/integration-vault.ts'
+      - 'packages/db/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/step1-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leo-os-step1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  step1:
+    name: step1-runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: founder_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d founder_os_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/founder_os_test
+      NODE_ENV: test
+      LEO_OS_WORKER_RUN: false
+      SESSION_SECRET: step1-certification-session-secret
+      INTEGRATION_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.15.0 --activate
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Validate and migrate database
+        run: pnpm db:validate && pnpm db:migrate
+      - name: Core intelligence gateway tests
+        run: pnpm --filter @founder-os/core test
+      - name: Worker runtime and integration handler tests
+        run: pnpm --filter @founder-os/worker test
+      - name: Full typecheck
+        run: pnpm typecheck
+      - name: Full build
+        run: pnpm build
+      - name: Database and integration regression
+        run: pnpm test:integration
