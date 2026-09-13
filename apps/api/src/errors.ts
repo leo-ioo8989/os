@@ -1,4 +1,4 @@
-export type ApiErrorCode = 'UNAUTHENTICATED' | 'UNAUTHORIZED' | 'NOT_FOUND' | 'CONFLICT' | 'VALIDATION_ERROR' | 'INTERNAL_ERROR';
+export type ApiErrorCode = 'UNAUTHENTICATED' | 'UNAUTHORIZED' | 'NOT_FOUND' | 'CONFLICT' | 'VALIDATION_ERROR' | 'RATE_LIMITED' | 'INTERNAL_ERROR';
 export class ApiError extends Error {
   constructor(public readonly status: 401 | 403 | 404 | 409 | 422 | 429 | 500, public readonly code: ApiErrorCode, message: string) {
     super(message);
