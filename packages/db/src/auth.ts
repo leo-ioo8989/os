@@ -28,6 +28,7 @@ export function hashSessionToken(token: string): string {
 
 export async function createSession(db: PrismaClient, userId: string, ttlMs = 1000 * 60 * 60 * 24 * 7) {
   const token = randomBytes(32).toString('base64url');
+  await db.session.deleteMany({ where: { expiresAt: { lte: new Date() } } });
   await db.session.create({
     data: { userId, tokenHash: hashSessionToken(token), expiresAt: new Date(Date.now() + ttlMs) },
   });
@@ -39,7 +40,11 @@ export async function authenticateSession(db: PrismaClient, token: string) {
     where: { tokenHash: hashSessionToken(token) },
     include: { user: true },
   });
-  if (!session || session.expiresAt <= new Date()) return null;
+  if (!session) return null;
+  if (session.expiresAt <= new Date()) {
+    await db.session.deleteMany({ where: { id: session.id, expiresAt: { lte: new Date() } } });
+    return null;
+  }
   await db.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
   return session.user;
 }
