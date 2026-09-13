@@ -6,7 +6,7 @@ import { ApiError } from './errors.js';
 export type OAuthProvider = 'google' | 'slack' | 'github';
 const providers: Record<OAuthProvider, { label:string; description:string; scopes:string[]; auth:string; token:string; capabilities:string[] }> = {
  google:{label:'Google Workspace',description:'Gmail, Calendar and Drive through one governed connection.',scopes:['openid','email','profile','https://www.googleapis.com/auth/gmail.modify','https://www.googleapis.com/auth/calendar','https://www.googleapis.com/auth/drive'],auth:'https://accounts.google.com/o/oauth2/v2/auth',token:'https://oauth2.googleapis.com/token',capabilities:['gmail.read','gmail.send','calendar.read','calendar.write','drive.read','drive.write']},
- slack:{label:'Slack',description:'Read permitted workspace context and send governed messages.',scopes:['channels:read','chat:write','users:read'],auth:'https://slack.com/oauth/v2/authorize',token:'https://slack.com/api/oauth.v2.access',capabilities:['slack.read','slack.send']},
+ slack:{label:'Slack',description:'Read permitted workspace context and send governed messages.',scopes:['channels:read','chat:write'],auth:'https://slack.com/oauth/v2/authorize',token:'https://slack.com/api/oauth.v2.access',capabilities:['slack.read','slack.send']},
  github:{label:'GitHub',description:'Repositories and work items available through the control plane.',scopes:['read:user','repo','workflow'],auth:'https://github.com/login/oauth/authorize',token:'https://github.com/login/oauth/access_token',capabilities:['github.read','github.write','github.workflow']}
 };
 function isProvider(v:string):v is OAuthProvider{return v in providers;}
