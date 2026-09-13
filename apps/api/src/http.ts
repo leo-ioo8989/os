@@ -12,5 +12,8 @@ export async function readJson(req: IncomingMessage): Promise<Record<string, unk
   try { const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8')); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(); return value as Record<string, unknown>; }
   catch { throw new ApiError(422, 'VALIDATION_ERROR', 'Request body must be valid JSON.'); }
 }
-export function routeParts(url: string): string[] { return new URL(url, 'http://localhost').pathname.split('/').filter(Boolean).map(decodeURIComponent); }
+export function routeParts(url: string): string[] {
+  try { return new URL(url, 'http://localhost').pathname.split('/').filter(Boolean).map(decodeURIComponent); }
+  catch { throw new ApiError(400, 'INVALID_REQUEST', 'URL path encoding is invalid.'); }
+}
 export function pathId(value: string | undefined, field: string): string { if (!value || value.length > 128) throw new ApiError(422, 'VALIDATION_ERROR', `${field} is invalid.`); return value; }

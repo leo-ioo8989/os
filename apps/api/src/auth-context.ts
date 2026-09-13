@@ -6,15 +6,15 @@ import { authenticateSession } from '@founder-os/db';
 import { ApiError } from './errors.js';
 export interface AuthContext { userId: string; email: string; organizationId: string; role: Role; }
 function header(headers: IncomingHttpHeaders, name: string): string | undefined { const value = headers[name]; return Array.isArray(value) ? value[0] : value; }
+function decodeCookie(value: string): string { try { return decodeURIComponent(value); } catch { throw new ApiError(401, 'UNAUTHENTICATED', 'Authentication is required.'); } }
 function sessionToken(headers: IncomingHttpHeaders): string | undefined {
   const authorization = header(headers, 'authorization');
   if (authorization?.startsWith('Bearer ')) return authorization.slice(7).trim() || undefined;
   const cookie = header(headers, 'cookie');
   const leoMatch = cookie?.match(/(?:^|;\s*)leo_os_session=([^;]+)/);
-  if (leoMatch?.[1]) return decodeURIComponent(leoMatch[1]);
-  // Compatibility: preserve existing sessions during the identity-only rename.
+  if (leoMatch?.[1]) return decodeCookie(leoMatch[1]);
   const legacyMatch = cookie?.match(/(?:^|;\s*)founder_os_session=([^;]+)/);
-  return legacyMatch?.[1] ? decodeURIComponent(legacyMatch[1]) : undefined;
+  return legacyMatch?.[1] ? decodeCookie(legacyMatch[1]) : undefined;
 }
 export async function authenticateRequest(db: PrismaClient, headers: IncomingHttpHeaders): Promise<{ userId: string; email: string }> {
   const token = sessionToken(headers);

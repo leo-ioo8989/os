@@ -53,10 +53,10 @@ export class DurableWorkerLoop {
   stop(): void { this.stopRequested = true; }
 
   private async recoverAndDispatch(): Promise<void> {
-    const jobs = await this.jobs.list(this.options.organizationId);
+    const jobs = await this.jobs.listRunnable(this.options.organizationId, new Date(), Math.max(50, this.concurrency * 4));
     for (const listedJob of jobs) {
       if (this.stopRequested || this.options.signal?.aborted || this.active.size >= this.concurrency) break;
-      const job = (listedJob.status === 'CLAIMED' || listedJob.status === 'RUNNING' || listedJob.status === 'RETRY_QUEUED')
+      const job = (listedJob.status === 'CLAIMED' || listedJob.status === 'RUNNING')
         ? await this.jobs.resumeCandidate(this.options.organizationId, listedJob.id)
         : listedJob;
       if (!job || (job.status !== 'QUEUED' && job.status !== 'RETRY_QUEUED' && job.status !== 'CLAIMED')) continue;
