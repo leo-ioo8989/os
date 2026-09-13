@@ -1,1 +1,65 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#070b14"><meta name="description" content="LEO OS — private company operating system"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="icon" href="/icon.svg"><link rel="apple-touch-icon" href="/icon.svg"><link rel="manifest" href="/manifest.webmanifest"><title>LEO OS</title><link rel="stylesheet" href="/styles.css"></head><body><div id="login" class="login-shell"><form id="login-form" class="login-card"><div class="logo">L</div><p class="eyebrow">PRIVATE COMPANY OS</p><h1>Sign in to LEO OS</h1><p class="muted">Your company operating environment.</p><label>Email<input id="email" type="email" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required minlength="12"></label><button type="submit">Enter LEO OS</button><p id="login-error" class="error"></p></form></div><div id="app" class="os hidden"><header class="os-top"><div class="brand"><div class="logo">L</div><div><b>LEO OS</b><small>Company Environment</small></div></div><button id="logout" class="ghost">Sign out</button></header><main class="home" id="main"><section class="hero"><p class="eyebrow">LEOPUT</p><h1>What should LEO build?</h1><form id="intent-form" class="leoput"><span>⌕</span><input id="intent" autocomplete="off" placeholder="Build me a website…" aria-label="Tell LEO what to do"><button>Run</button></form><p class="hint">Ask, build, research, connect, automate or operate — LEO will turn intent into a governed workspace.</p></section><section class="widget-grid"><button class="app-tile" data-view="gallery"><strong>▣</strong><span>Gallery</span><small>Projects & assets</small></button><button class="app-tile" data-view="apps"><strong>⊞</strong><span>App Library</span><small>Connect & install</small></button><button class="app-tile" data-view="ai"><strong>✦</strong><span>AI Hub</span><small>Models & workers</small></button><button class="app-tile" data-view="workbench"><strong>⌘</strong><span>Workbench</span><small>Active builds</small></button><button class="app-tile" data-view="objectives"><strong>◈</strong><span>Objectives</span><small>Company goals</small></button><button class="app-tile" data-view="operations"><strong>⚙</strong><span>Operations</span><small>Workers & jobs</small></button><button class="app-tile" data-view="activity"><strong>◷</strong><span>Activity</span><small>Audit & provenance</small></button><button class="app-tile" data-view="security"><strong>◆</strong><span>Security</span><small>Identity & policy</small></button></section><section id="workspace" class="workspace hidden"><div class="workspace-head"><div><p class="eyebrow">LEO WORKSPACE</p><h2 id="workspace-title">Ready</h2></div><button id="close-workspace" class="ghost">Close</button></div><div id="workspace-body"></div></section></main><footer>INTELLIGENCE MAY PROPOSE · POLICY MAY AUTHORIZE · CONTROL PLANE DECIDES · EXECUTORS EXECUTE</footer></div><div id="toast" class="toast"></div><script src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="description" content="LEO OS — Leadership & Execution Operating System">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="/icon.svg"><link rel="apple-touch-icon" href="/icon.svg"><link rel="manifest" href="/manifest.webmanifest">
+<title>LEO OS · Command Center</title><link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="login" class="login-shell">
+<form id="login-form" class="login-card">
+<div class="logo">L</div><p class="eyebrow">LEO OS · COMMAND CENTER</p><h1>Sign in to LEO OS</h1><p class="muted">Your governed company execution environment.</p>
+<label>Email<input id="email" type="email" autocomplete="username" required></label>
+<label>Password<input id="password" type="password" autocomplete="current-password" required minlength="12"></label>
+<button type="submit">Enter LEO OS</button><p id="login-error" class="error"></p>
+</form></div>
+
+<div id="app" class="os hidden">
+<header class="os-top">
+<div class="brand"><div class="logo">L</div><div><b>LEO OS</b><small>Leadership &amp; Execution Operating System</small></div></div>
+<div class="top-actions"><span class="status-pill"><i></i> Control plane</span><button id="logout" class="ghost">Sign out</button></div>
+</header>
+
+<main class="home" id="main">
+<section class="hero">
+<div class="hero-copy"><p class="eyebrow">LEOPUT · CUSTOMER INTAKE</p><h1>Give LEO the work.<br><em>LEO turns intent into execution.</em></h1><p class="hero-sub">Paste a real customer request. LEO classifies it, creates a governed objective, workspace, workflow and job — then gives you the execution trail.</p></div>
+<form id="intent-form" class="leoput-card">
+<div class="composer-head"><div><span class="composer-dot"></span><b>New LeOpUT request</b></div><span class="badge">GREEN / YELLOW policy-aware</span></div>
+<label for="intent" class="sr-only">Customer request</label>
+<textarea id="intent" autocomplete="off" spellcheck="true" placeholder="Paste the complete customer request here…&#10;&#10;Example: Build a complete modern business website for a local fitness studio called FitZone Studio. Include Home, About, Programs, Trainers, Pricing and Contact…" aria-label="Customer request"></textarea>
+<div class="composer-foot"><span id="char-count">0 / 4000</span><button type="submit">Run through LeOpUT <span>→</span></button></div>
+</form>
+<div class="quick-row"><button type="button" class="quick" data-example="website">Load website test request</button><span>or paste any governed business request above</span></div>
+</section>
+
+<section class="pipeline" aria-label="LeOpUT pipeline">
+<div class="pipeline-step"><span>01</span><b>Understand</b><small>Requirements &amp; audience</small></div><div class="pipeline-line"></div>
+<div class="pipeline-step"><span>02</span><b>Govern</b><small>Risk &amp; policy checks</small></div><div class="pipeline-line"></div>
+<div class="pipeline-step"><span>03</span><b>Plan</b><small>Objective &amp; workflow</small></div><div class="pipeline-line"></div>
+<div class="pipeline-step"><span>04</span><b>Execute</b><small>Workspace &amp; job trail</small></div>
+</section>
+
+<section class="widget-grid">
+<button class="app-tile featured" data-view="workbench"><strong>⌘</strong><span>Workbench</span><small>Active builds &amp; workspaces</small></button>
+<button class="app-tile" data-view="gallery"><strong>▣</strong><span>Gallery</span><small>Projects &amp; generated assets</small></button>
+<button class="app-tile" data-view="objectives"><strong>◈</strong><span>Objectives</span><small>Company goals &amp; plans</small></button>
+<button class="app-tile" data-view="operations"><strong>⚙</strong><span>Operations</span><small>Jobs, workers &amp; approvals</small></button>
+<button class="app-tile" data-view="activity"><strong>◷</strong><span>Activity</span><small>Audit &amp; provenance</small></button>
+<button class="app-tile" data-view="apps"><strong>⊞</strong><span>App Library</span><small>Connections &amp; integrations</small></button>
+<button class="app-tile" data-view="ai"><strong>✦</strong><span>AI Hub</span><small>Models &amp; intelligence</small></button>
+<button class="app-tile" data-view="security"><strong>◆</strong><span>Security</span><small>Identity &amp; policy boundary</small></button>
+</section>
+
+<section id="workspace" class="workspace hidden"><div class="workspace-head"><div><p class="eyebrow">LEO WORKSPACE</p><h2 id="workspace-title">Ready</h2></div><button id="close-workspace" class="ghost">Close</button></div><div id="workspace-body"></div></section>
+</main>
+<footer>INTELLIGENCE MAY PROPOSE · POLICY MAY AUTHORIZE · CONTROL PLANE DECIDES · EXECUTORS EXECUTE</footer>
+</div>
+<div id="toast" class="toast"></div>
+<script src="/app.js"></script>
+</body></html>
