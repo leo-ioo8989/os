@@ -26,9 +26,16 @@ export function hashSessionToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+export async function cleanupExpiredSessions(db: PrismaClient, now = new Date(), limit = 1000): Promise<number> {
+  const expired = await db.session.findMany({ where: { expiresAt: { lte: now } }, select: { id: true }, take: limit });
+  if (expired.length === 0) return 0;
+  const result = await db.session.deleteMany({ where: { id: { in: expired.map(x => x.id) } } });
+  return result.count;
+}
+
 export async function createSession(db: PrismaClient, userId: string, ttlMs = 1000 * 60 * 60 * 24 * 7) {
   const token = randomBytes(32).toString('base64url');
-  await db.session.deleteMany({ where: { expiresAt: { lte: new Date() } } });
+  await cleanupExpiredSessions(db);
   await db.session.create({
     data: { userId, tokenHash: hashSessionToken(token), expiresAt: new Date(Date.now() + ttlMs) },
   });
