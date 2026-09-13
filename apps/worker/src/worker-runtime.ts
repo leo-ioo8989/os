@@ -76,7 +76,7 @@ export class WorkerRuntime {
     if (!this.options.authorizeExecution) return { kind: 'denied', jobId, reason: 'Execution Gateway authorizer is required.' };
 
     let claim: { kind: 'claimed' } | { kind: string };
-    let worker: Awaited<ReturnType<WorkerRepository['authenticate']>> = null;
+    let worker: Awaited<ReturnType<JobService['authenticateWorker']>>;
     try {
       worker = await this.jobs.authenticateWorker(organizationId, workerId, credential);
     } catch {
