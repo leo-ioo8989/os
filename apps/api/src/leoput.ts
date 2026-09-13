@@ -19,7 +19,9 @@ function classify(raw: string): LeOpUTIntent {
   const website = /\b(build|create|make|design|develop)\b.*\b(website|web app|landing page|site)\b/.test(lower) || /\bwebsite\b/.test(lower);
   const research = /\b(research|analy[sz]e|compare|find out|investigate)\b/.test(lower);
   const automation = /\b(automate|schedule|workflow|recurring|every day|every week)\b/.test(lower);
-  const risk = /\b(delete|send|publish|deploy|purchase|pay|transfer|remove|invite)\b/.test(lower) ? 'YELLOW' : 'GREEN';
+  const dangerous = /\b(delete|send|publish|deploy|purchase|pay|transfer|remove|invite)\b/.test(lower);
+  const negatedDangerous = /\b(do not|don't|dont|never|avoid|without)\s+(?:\w+\s+){0,3}(delete|send|publish|deploy|purchase|pay|transfer|remove|invite)\b/.test(lower);
+  const risk = dangerous && !negatedDangerous ? 'YELLOW' : 'GREEN';
   const kind = website ? 'website' : research ? 'research' : automation ? 'automation' : /\b(company|business|sales|marketing|finance|operations|hr)\b/.test(lower) ? 'company-work' : 'general';
   const title = text.length > 96 ? `${text.slice(0, 93)}...` : text;
   const steps = website
@@ -54,24 +56,24 @@ export async function createLeOpUT(db: PrismaClient, headers: Record<string, str
   const jobId = randomUUID();
   const content = intent.kind === 'website' ? websiteSeed(intent) : { steps: intent.steps, intent: intent.raw };
   await db.$transaction(async (tx) => {
-    await tx.$executeRaw`INSERT INTO "Objective" ("id","organizationId","title","description","createdBy","priority","status","riskLevel","successCriteria","metadata") VALUES (${objectiveId},${c.organizationId},${intent.title},${intent.raw},${c.userId},'MEDIUM','PLANNING',${intent.risk},${JSON.stringify(intent.steps)}::jsonb,${JSON.stringify({source:'LeOpUT',workspaceId,kind:intent.kind})}::jsonb)`;
-    await tx.$executeRaw`INSERT INTO "Task" ("id","objectiveId","title","description","status","riskLevel","metadata") VALUES (${taskId},${objectiveId},${intent.steps[0]},${intent.steps.join(' → ')},'READY',${intent.risk},${JSON.stringify({source:'LeOpUT',workspaceId,kind:intent.kind,handlerId:'internal.leoput.plan',capability:'workspace.plan',risk:'LOW',action:'plan',target:workspaceId,parameters:{workspaceId,intent:intent.raw,kind:intent.kind,steps:intent.steps}})}::jsonb)`;
-    await tx.$executeRaw`INSERT INTO "Workflow" ("id","organizationId","objectiveId","currentState","status","currentTaskId","resumableState","metadata") VALUES (${workflowId},${c.organizationId},${objectiveId},'LEOPUT_PLANNED','PENDING',${taskId},${JSON.stringify({workspaceId,intent})}::jsonb,${JSON.stringify({source:'LeOpUT'})}::jsonb)`;
-    await tx.$executeRaw`INSERT INTO "Job" ("id","organizationId","objectiveId","taskId","workflowId","idempotencyKey","status","maxAttempts","resumableState","metadata") VALUES (${jobId},${c.organizationId},${objectiveId},${taskId},${workflowId},${`leoput:${workspaceId}`},'QUEUED',3,${JSON.stringify({workspaceId})}::jsonb,${JSON.stringify({source:'LeOpUT',handlerId:'internal.leoput.plan',capability:'workspace.plan',risk:'LOW',action:'plan',target:workspaceId})}::jsonb)`;
-    await tx.$executeRaw`INSERT INTO "Workspace" ("id","organizationId","createdBy","title","kind","status","intent","content","version","updatedAt") VALUES (${workspaceId},${c.organizationId},${c.userId},${intent.title},${intent.kind},'ACTIVE',${intent.raw},${JSON.stringify(content)}::jsonb,1,NOW())`;
-    await tx.$executeRaw`INSERT INTO "AuditEvent" ("id","organizationId","actorId","actorType","eventType","resourceType","resourceId","action","result","metadata") VALUES (${randomUUID()},${c.organizationId},${c.userId},'USER',${AUDIT_EVENTS.OBJECTIVE_CREATED},'Workspace',${workspaceId},'leoput.plan','SUCCESS',${JSON.stringify({objectiveId,taskId,workflowId,jobId,kind:intent.kind,risk:intent.risk})}::jsonb)`;
+    await tx.objective.create({data:{id:objectiveId,organizationId:c.organizationId,title:intent.title,description:intent.raw,createdBy:c.userId,priority:'MEDIUM',status:'PLANNING',riskLevel:intent.risk,successCriteria:intent.steps,metadata:{source:'LeOpUT',workspaceId,kind:intent.kind}}});
+    await tx.task.create({data:{id:taskId,objectiveId,title:intent.steps[0],description:intent.steps.join(' → '),status:'READY',riskLevel:intent.risk,metadata:{source:'LeOpUT',workspaceId,kind:intent.kind,handlerId:'internal.leoput.plan',capability:'workspace.plan',risk:'LOW',action:'plan',target:workspaceId,parameters:{workspaceId,intent:intent.raw,kind:intent.kind,steps:intent.steps}}}});
+    await tx.workflow.create({data:{id:workflowId,organizationId:c.organizationId,objectiveId,currentState:'LEOPUT_PLANNED',status:'PENDING',currentTaskId:taskId,resumableState:{workspaceId,intent},metadata:{source:'LeOpUT'}}});
+    await tx.job.create({data:{id:jobId,organizationId:c.organizationId,objectiveId,taskId,workflowId,idempotencyKey:`leoput:${workspaceId}`,status:'QUEUED',maxAttempts:3,resumableState:{workspaceId},metadata:{source:'LeOpUT',handlerId:'internal.leoput.plan',capability:'workspace.plan',risk:'LOW',action:'plan',target:workspaceId}}});
+    await tx.workspace.create({data:{id:workspaceId,organizationId:c.organizationId,createdBy:c.userId,title:intent.title,kind:intent.kind,status:'ACTIVE',intent:intent.raw,content,version:1,updatedAt:new Date()}});
+    await tx.auditEvent.create({data:{id:randomUUID(),organizationId:c.organizationId,actorId:c.userId,actorType:'USER',eventType:AUDIT_EVENTS.OBJECTIVE_CREATED,resourceType:'Workspace',resourceId:workspaceId,action:'leoput.plan',result:'SUCCESS',metadata:{objectiveId,taskId,workflowId,jobId,kind:intent.kind,risk:intent.risk}}});
   });
   return { intent, workspaceId, objectiveId, taskId, workflowId, jobId, state: 'PLANNED' };
 }
 
 export async function listWorkspaces(db: PrismaClient, headers: Record<string, string | string[] | undefined>) {
   const c = await requireOrganization(db, headers, 'objective:read');
-  return db.$queryRaw`SELECT "id","title","kind","status","intent","content","version","createdAt","updatedAt" FROM "Workspace" WHERE "organizationId"=${c.organizationId} ORDER BY "updatedAt" DESC LIMIT 100`;
+  return db.workspace.findMany({where:{organizationId:c.organizationId},select:{id:true,title:true,kind:true,status:true,intent:true,content:true,version:true,createdAt:true,updatedAt:true},orderBy:{updatedAt:'desc'},take:100});
 }
 
 export async function getWorkspace(db: PrismaClient, headers: Record<string, string | string[] | undefined>, id: string) {
   const c = await requireOrganization(db, headers, 'objective:read');
-  const rows = await db.$queryRaw<Array<Record<string, unknown>>>`SELECT "id","title","kind","status","intent","content","version","createdAt","updatedAt" FROM "Workspace" WHERE "organizationId"=${c.organizationId} AND "id"=${id} LIMIT 1`;
-  if (!rows[0]) throw new ApiError(404, 'NOT_FOUND', 'Workspace not found.');
-  return rows[0];
+  const row = await db.workspace.findFirst({where:{organizationId:c.organizationId,id},select:{id:true,title:true,kind:true,status:true,intent:true,content:true,version:true,createdAt:true,updatedAt:true}});
+  if (!row) throw new ApiError(404, 'NOT_FOUND', 'Workspace not found.');
+  return row;
 }
