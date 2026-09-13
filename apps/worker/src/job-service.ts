@@ -8,6 +8,7 @@ export class JobService {
   private readonly workers: WorkerRepository;
   constructor(private readonly db: PrismaClient) { this.repository = new JobRepository(db); this.workers = new WorkerRepository(db); }
   list(organizationId:string){return this.repository.list(organizationId)}
+  listRunnable(organizationId:string,now=new Date(),limit=50){return this.repository.listRunnable(organizationId,now,limit)}
   get(organizationId:string,id:string){return this.repository.get(organizationId,id)}
   create(input:Parameters<JobRepository['create']>[0],actorId?:string){return this.repository.create(input,{organizationId:input.organizationId,actorId,actorType:actorId?'USER':'SYSTEM',eventType:AUDIT_EVENTS.JOB_CREATED,action:'create',result:'SUCCESS'});}
   async authenticateWorker(organizationId:string,workerId:string,credential:string){const worker=await this.workers.authenticate(organizationId,workerId,credential,{organizationId,actorType:'SYSTEM',eventType:AUDIT_EVENTS.WORKER_AUTHENTICATED,action:'authenticate',result:'SUCCESS'});if(!worker)throw new Error('Worker authentication failed.');return worker;}
