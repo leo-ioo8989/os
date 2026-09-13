@@ -1,8 +1,9 @@
 import type { PrismaClient } from '@founder-os/db';
-import { AUDIT_EVENTS } from '@founder-os/db';
+import { AUDIT_EVENTS, WorkerRepository } from '@founder-os/db';
 import { JobService } from './job-service.js';
 import { ExecutionHandlerRegistry, validateHandlerResult } from './execution-handlers.js';
 
+export type ExecutionEnvironment = 'development' | 'staging' | 'production';
 export type ExecutionRequest = {
   organizationId: string;
   workerId: string;
@@ -11,14 +12,14 @@ export type ExecutionRequest = {
   target: string;
   risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   parameters: Record<string, unknown>;
-  environment?: 'development' | 'staging' | 'production';
+  environment?: ExecutionEnvironment;
   capability: string;
   credential: string;
   approvalId?: string;
 };
 export type ExecutionAuthorizer = (request: ExecutionRequest) => Promise<{ decision: 'ALLOW' | 'DENY' | 'REQUIRES_APPROVAL'; approvalId?: string; fingerprint?: string }>;
 export type ApprovalConsumer = (organizationId: string, workerId: string, approvalId: string, intent: ExecutionRequest) => Promise<unknown>;
-export interface WorkerRuntimeOptions { leaseMs?: number; heartbeatMs?: number; authorizeExecution?: ExecutionAuthorizer; consumeExecutionApproval?: ApprovalConsumer; registry?: ExecutionHandlerRegistry }
+export interface WorkerRuntimeOptions { leaseMs?: number; heartbeatMs?: number; environment?: ExecutionEnvironment; authorizeExecution?: ExecutionAuthorizer; consumeExecutionApproval?: ApprovalConsumer; registry?: ExecutionHandlerRegistry }
 export interface WorkerRunResult { kind: 'succeeded' | 'failed' | 'waiting_approval' | 'denied' | 'not_claimed' | 'not_found' | 'invalid'; jobId: string; reason?: string }
 
 function spec(metadata: unknown) {
@@ -33,17 +34,26 @@ function spec(metadata: unknown) {
   return handlerId && capability && risk ? { handlerId, capability, action, target, risk, parameters } : null;
 }
 
+function configuredEnvironment(value: string | undefined): ExecutionEnvironment {
+  if (value === 'production' || value === 'staging' || value === 'development') return value;
+  return 'development';
+}
+
 export class WorkerRuntime {
   private readonly jobs: JobService;
+  private readonly workers: WorkerRepository;
   private readonly registry: ExecutionHandlerRegistry;
   private readonly leaseMs: number;
   private readonly heartbeatMs: number;
+  private readonly environment: ExecutionEnvironment;
 
   constructor(private readonly db: PrismaClient, private readonly options: WorkerRuntimeOptions = {}) {
     this.jobs = new JobService(db);
+    this.workers = new WorkerRepository(db);
     this.registry = options.registry ?? new ExecutionHandlerRegistry();
     this.leaseMs = options.leaseMs ?? 30000;
     this.heartbeatMs = options.heartbeatMs ?? 10000;
+    this.environment = options.environment ?? configuredEnvironment(process.env.NODE_ENV);
   }
 
   async run(organizationId: string, jobId: string, workerId: string, credential: string, approvalId?: string): Promise<WorkerRunResult> {
@@ -66,11 +76,20 @@ export class WorkerRuntime {
     if (!this.options.authorizeExecution) return { kind: 'denied', jobId, reason: 'Execution Gateway authorizer is required.' };
 
     let claim: { kind: 'claimed' } | { kind: string };
+    let worker: Awaited<ReturnType<WorkerRepository['authenticate']>> = null;
+    try {
+      worker = await this.jobs.authenticateWorker(organizationId, workerId, credential);
+    } catch {
+      return { kind: 'not_claimed', jobId, reason: 'Worker authentication failed.' };
+    }
+    const capabilities = Array.isArray(worker.capabilities) ? worker.capabilities.filter((v): v is string => typeof v === 'string') : [];
+    if (!capabilities.includes(s.capability)) {
+      return { kind: 'denied', jobId, reason: 'Worker does not have the required capability.' };
+    }
     if (job.status === 'CLAIMED') {
-      try { await this.jobs.authenticateWorker(organizationId, workerId, credential); } catch { return { kind: 'not_claimed', jobId, reason: 'Worker authentication failed.' }; }
       claim = { kind: 'claimed' };
     } else {
-      try { claim = await this.jobs.claimAuthenticated(organizationId, jobId, workerId, credential, this.leaseMs); } catch { return { kind: 'not_claimed', jobId, reason: 'Worker authentication failed.' }; }
+      try { claim = await this.jobs.claim(organizationId, jobId, workerId, this.leaseMs); } catch { return { kind: 'not_claimed', jobId, reason: 'Job claim failed.' }; }
     }
     if (claim.kind !== 'claimed') return { kind: 'not_claimed', jobId, reason: claim.kind };
 
@@ -86,7 +105,7 @@ export class WorkerRuntime {
       target: s.target,
       risk: s.risk,
       parameters: s.parameters,
-      environment: 'development',
+      environment: this.environment,
       capability: s.capability,
       credential,
       approvalId,
