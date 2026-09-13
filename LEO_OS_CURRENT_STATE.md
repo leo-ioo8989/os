@@ -1,37 +1,66 @@
 # LEO OS — CURRENT STATE
 
 **Product:** LEO OS — Leadership & Execution Operating System  
-**Audit date:** 2026-09-12  
-**Repository:** `haeshitsa/firsy`  
-**Current work:** Production completion before final runtime certification
+**Audit date:** 2026-09-13  
+**Implementation repository:** `leo-ioo8989/os`  
+**Implementation baseline:** `main` at `aee806453e79cea9e7f56619b3e798af184cfdf4`  
+**GitHub default branch:** `temp` (currently same HEAD as `main`)  
+**Current work:** Baseline Recovery & Certification R1
+
+## CURRENT CERTIFICATION STATUS
+
+**R1 STATUS: BLOCKED — NOT CURRENTLY CERTIFIED.**
+
+The current repository contains substantial Phase 1–5 implementation lineage and post-production-completion hardening. Historical certification records are retained as historical evidence only. They do not certify the current HEAD.
+
+Current-head CI, runtime, and security verification must be obtained before the current baseline can be declared verified/certified.
 
 ## FROZEN ARCHITECTURE
 
-Phase 1, Phase 2 and Phase 3 are frozen and certified. Phase 3 ends at V3.11; there is no V3.12+. Phase 4 (V4.01–V4.12) and Phase 5 (V5.01–V5.12) have been implemented with their certification gates previously passing.
+Phase 1, Phase 2 and Phase 3 have historical frozen/certified lineage. Phase 3 ends at V3.11; there is no V3.12+. Phase 4 (V4.01–V4.12) and Phase 5 (V5.01–V5.12) have historical implementation and certification gates.
 
 The architecture preserves one authority chain:
 
 **INTELLIGENCE MAY PROPOSE → POLICY MAY AUTHORIZE → CONTROL PLANE DECIDES → EXECUTORS EXECUTE → LEO OS RECORDS.**
 
+No current R1 evidence establishes a second control plane, second executor, or unauthorized AI execution path. Runtime certification of these boundaries remains pending.
+
 ## PRODUCTION COMPLETION
 
-The `production-completion` branch adds the remaining productization surface identified after Phase 5:
+The historical `production-completion` branch is `fd6791fec8c4f782d8c6e0c2705be2582bcfe795`. Current `main` is 13 commits ahead and 0 commits behind that baseline.
 
-- dependency-free private Command Center web app;
-- authenticated API integration for live objective visibility;
-- API liveness and PostgreSQL readiness probes;
-- production-readiness documentation and local operating instructions;
-- refreshed repository state documentation so stale Phase-2-only status is removed.
+Post-production-completion work includes:
 
-The Command Center is deliberately read-only for operational state in this baseline. Mutations remain behind the existing authenticated API/control-plane path. No second executor, policy engine or authorization source is introduced.
+- runtime CI gate;
+- intelligence gateway hardening;
+- provider runtime bounds;
+- worker execution hardening;
+- stale lease recovery;
+- governed LeOpUT worker execution;
+- integration permission separation;
+- runtime enforcement of `integration:use`.
+
+These changes are candidates for the recovered baseline but require current-head regression and runtime verification.
 
 ## PRIVATE / INTERNAL BOUNDARY
 
-LEO OS remains private company infrastructure. This completion pass does not activate Gmail, Instagram, MCP, model providers, n8n, browser/computer automation, or public SaaS integrations. Those remain explicit architectural decisions behind the existing adapter and authorization boundaries.
+LEO OS remains private company infrastructure at the architecture level. External integrations remain behind explicit adapter and authorization boundaries. This state document does not treat the existence of integration code as proof that external providers are currently runtime-enabled or certified.
 
-## CERTIFICATION STATUS
+## BRANCH AUTHORITY
 
-**Do not call the `production-completion` branch runtime-certified yet.** Code completion is being separated from the final verification gate as requested. After all implementation work is complete, the final head should undergo the full certification/regression process and only then be declared locked.
+`main` is the recommended implementation authority based on the current implementation and production lineage. `temp` remains the GitHub default branch but currently points to the same commit as `main`. This discrepancy must be resolved deliberately; it must not be silently changed during verification.
+
+## R1 RECOVERY REQUIREMENTS
+
+1. Resolve branch authority.
+2. Reconcile state documentation.
+3. Run the complete appropriate regression suite against current HEAD.
+4. Verify runtime behavior.
+5. Verify security and authorization boundaries.
+6. Certify only if all required evidence passes.
+7. Freeze the verified SHA.
+
+Until then, the current status is **NOT CERTIFIED / VERIFICATION PENDING**.
 
 See:
 - `docs/LEO_OS_PHASE_4_PHASE_5_FULL_ARCHITECTURE.md`
